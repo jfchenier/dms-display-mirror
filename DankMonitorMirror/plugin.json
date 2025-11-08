@@ -1,0 +1,19 @@
+{
+    "id": "dankMonitorMirror",
+    "name": "Dank Display Mirror",
+    "description": "Mirror displays using wl-mirror from the Control Center",
+    "version": "1.0.0",
+    "author": "Avenge Media",
+    "icon": "screen_share",
+    "type": "widget",
+    "capabilities": [
+        "control-center"
+    ],
+    "firstParty": true,
+    "component": "./DankMonitorMirrorWidget.qml",
+    "settings": "./DankMonitorMirrorSettings.qml",
+    "permissions": [
+        "settings_read",
+        "settings_write"
+    ]
+}
