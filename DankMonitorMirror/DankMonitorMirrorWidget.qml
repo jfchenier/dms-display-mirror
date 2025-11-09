@@ -55,10 +55,22 @@ PluginComponent {
         return result
     }
 
-    // Return monitors excluding the current focused/active display
+    // Return monitors excluding the current focused/active display and any display currently being used as a mirror target
     function filteredMonitors() {
         if (!currentFocusedOutput) return monitors
-        return monitors.filter(m => m !== currentFocusedOutput)
+        
+        // Get all displays currently being used as mirror targets
+        const targetDisplays = new Set()
+        const pids = Object.keys(MirrorState.activeMirrors)
+        for (let i = 0; i < pids.length; i++) {
+            const mirror = MirrorState.activeMirrors[pids[i]]
+            if (mirror && mirror.target) {
+                targetDisplays.add(mirror.target)
+            }
+        }
+        
+        // Filter out current focused output and any target displays
+        return monitors.filter(m => m !== currentFocusedOutput && !targetDisplays.has(m))
     }
 
     // Control Center tile properties
@@ -519,14 +531,14 @@ PluginComponent {
                         spacing: Theme.spacingS
 
                         DankIcon {
-                            name: "monitor_off"
+                            name: root.monitors.length === 0 ? "monitor_off" : "check_circle"
                             size: Theme.iconSize + 16
                             color: Theme.surfaceVariantText
                             anchors.horizontalCenter: parent.horizontalCenter
                         }
 
                         StyledText {
-                            text: "No displays found"
+                            text: root.monitors.length === 0 ? "No displays found" : "No displays available"
                             font.pixelSize: Theme.fontSizeMedium
                             color: Theme.surfaceText
                             anchors.horizontalCenter: parent.horizontalCenter
@@ -537,6 +549,7 @@ PluginComponent {
                             font.pixelSize: Theme.fontSizeSmall
                             color: Theme.surfaceVariantText
                             anchors.horizontalCenter: parent.horizontalCenter
+                            visible: root.monitors.length === 0
                         }
                     }
                 }
@@ -865,14 +878,14 @@ PluginComponent {
                         spacing: Theme.spacingS
 
                         DankIcon {
-                            name: "monitor_off"
+                            name: root.monitors.length === 0 ? "monitor_off" : "check_circle"
                             size: Theme.iconSize + 16
                             color: Theme.surfaceVariantText
                             anchors.horizontalCenter: parent.horizontalCenter
                         }
 
                         StyledText {
-                            text: "No displays found"
+                            text: root.monitors.length === 0 ? "No displays found" : "No displays available"
                             font.pixelSize: Theme.fontSizeMedium
                             color: Theme.surfaceText
                             anchors.horizontalCenter: parent.horizontalCenter
@@ -883,6 +896,7 @@ PluginComponent {
                             font.pixelSize: Theme.fontSizeSmall
                             color: Theme.surfaceVariantText
                             anchors.horizontalCenter: parent.horizontalCenter
+                            visible: root.monitors.length === 0
                         }
                     }
                 }
