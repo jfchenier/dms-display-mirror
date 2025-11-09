@@ -61,9 +61,18 @@ PluginComponent {
     function filteredMonitors() {
         if (!currentFocusedOutput) return monitors
         
+        // Check if current display is already being used as a source
+        const pids = Object.keys(MirrorState.activeMirrors)
+        for (let i = 0; i < pids.length; i++) {
+            const mirror = MirrorState.activeMirrors[pids[i]]
+            if (mirror && mirror.source === currentFocusedOutput) {
+                // Current display is already mirroring, hide all available displays
+                return []
+            }
+        }
+        
         // Get all displays currently being used as mirror targets
         const targetDisplays = new Set()
-        const pids = Object.keys(MirrorState.activeMirrors)
         for (let i = 0; i < pids.length; i++) {
             const mirror = MirrorState.activeMirrors[pids[i]]
             if (mirror && mirror.target) {
