@@ -4,6 +4,22 @@ import QtQuick
 pragma Singleton
 
 QtObject {
-    property string activeMirrorPid: ""
-    property bool mirrorRunning: false
+    id: root
+    
+    // Store active mirrors as { outputName: pid }
+    property var activeMirrors: ({})
+    
+    // Helper to check if any mirrors are running
+    property bool hasActiveMirrors: Object.keys(activeMirrors).length > 0
+    
+    // Helper to get count of active mirrors
+    property int activeMirrorCount: Object.keys(activeMirrors).length
+    
+    // Signal when mirrors change
+    signal mirrorsChanged()
+    
+    onActiveMirrorsChanged: {
+        console.log("MirrorState: activeMirrors changed, count:", Object.keys(activeMirrors).length)
+        mirrorsChanged()
+    }
 }

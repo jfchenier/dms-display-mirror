@@ -16,23 +16,43 @@ PluginComponent {
     property var monitors: []
     property bool isLoading: false
     property bool justStartedMirror: false  // Track if we just started a mirror vs checking status
+    property string lastStartedSource: ""   // Track which source we just started mirroring
     
     // Use shared singleton state so all widget instances see the same values
-    property string activeMirrorPid: MirrorState.activeMirrorPid
-    property bool mirrorRunning: MirrorState.mirrorRunning
+    // activeMirrors structure: {pid: {source: "outputName", target: "outputName"}}
+    property var activeMirrors: MirrorState.activeMirrors
+    property bool hasActiveMirrors: MirrorState.hasActiveMirrors
+    property int activeMirrorCount: MirrorState.activeMirrorCount
     property string lastMirrorOutput: ""
     property string lastMirrorError: ""
     property string currentFocusedOutput: ""
 
-    // Update singleton when local properties would change
-    function setActiveMirrorPid(pid) {
-        console.log("MonitorMirror: Setting activeMirrorPid to:", pid)
-        MirrorState.activeMirrorPid = pid
+    // Helper functions to manage mirrors
+    function addMirror(pid, source, target) {
+        console.log("MonitorMirror: Adding mirror PID", pid, "source:", source, "target:", target)
+        var mirrors = Object.assign({}, MirrorState.activeMirrors)
+        mirrors[pid] = {source: source, target: target}
+        MirrorState.activeMirrors = mirrors
     }
     
-    function setMirrorRunning(running) {
-        console.log("MonitorMirror: Setting mirrorRunning to:", running)
-        MirrorState.mirrorRunning = running
+    function removeMirror(pid) {
+        console.log("MonitorMirror: Removing mirror PID", pid)
+        var mirrors = Object.assign({}, MirrorState.activeMirrors)
+        delete mirrors[pid]
+        MirrorState.activeMirrors = mirrors
+    }
+    
+    function getMirrorsBySource(sourceName) {
+        var result = []
+        var mirrors = Object.keys(MirrorState.activeMirrors)
+        for (let i = 0; i < mirrors.length; i++) {
+            const pid = mirrors[i]
+            const mirror = MirrorState.activeMirrors[pid]
+            if (mirror.source === sourceName) {
+                result.push({pid: pid, target: mirror.target})
+            }
+        }
+        return result
     }
 
     // Return monitors excluding the current focused/active display
@@ -44,19 +64,32 @@ PluginComponent {
     // Control Center tile properties
     ccWidgetIcon: "screen_share"
     ccWidgetPrimaryText: "Display Mirror"
-    ccWidgetSecondaryText: activeMirrorPid ? "Mirror active" : (monitors.length + " outputs")
-    ccWidgetIsActive: mirrorRunning
+    ccWidgetSecondaryText: hasActiveMirrors ? (activeMirrorCount + " mirror" + (activeMirrorCount > 1 ? "s" : "") + " active") : (monitors.length + " outputs")
+    ccWidgetIsActive: hasActiveMirrors
 
     onCcWidgetToggled: {
-        if (activeMirrorPid) {
-            stopMirror()
+        if (hasActiveMirrors) {
+            stopAllMirrors()
         }
     }
 
     Component.onCompleted: {
-        console.log("MonitorMirror: Widget completed. activeMirrorPid:", activeMirrorPid, "mirrorRunning:", mirrorRunning, "env PID:", Quickshell.env.DANK_MIRROR_PID, "env RUNNING:", Quickshell.env.DANK_MIRROR_RUNNING)
+        console.log("MonitorMirror: Widget completed. activeMirrorCount:", activeMirrorCount, "hasActiveMirrors:", hasActiveMirrors)
         refreshMonitors()
         detectFocusedOutput()
+        checkMirrorStatus()
+    }
+
+    // Watch for changes in the singleton to update local properties
+    Connections {
+        target: MirrorState
+        function onMirrorsChanged() {
+            console.log("MonitorMirror: Mirrors changed signal received")
+            // Force property re-evaluation
+            root.activeMirrors = MirrorState.activeMirrors
+            root.hasActiveMirrors = MirrorState.hasActiveMirrors
+            root.activeMirrorCount = MirrorState.activeMirrorCount
+        }
     }
 
     Timer {
@@ -84,36 +117,67 @@ PluginComponent {
     function startMirror(outputName) {
         if (!outputName || isLoading) return
 
-        // Stop any existing mirror first
-        stopMirror()
+        // Detect current focused output first
+        detectFocusedOutput()
+        
+        // Wait a moment for focus detection, then start mirror
+        Qt.callLater(() => {
+            const targetOutput = root.currentFocusedOutput
+            if (!targetOutput) {
+                console.warn("MonitorMirror: Could not detect target output")
+                lastMirrorError = "Could not detect current display"
+                return
+            }
+            
+            if (targetOutput === outputName) {
+                console.log("MonitorMirror: Cannot mirror display to itself")
+                lastMirrorError = "Cannot mirror a display to itself"
+                return
+            }
 
-        isLoading = true
-        justStartedMirror = true  // Mark that we're starting a new mirror
-        lastMirrorError = ""
-        lastMirrorOutput = ""
-        // Launch wl-mirror in background, echo its PID; keep stderr separate for diagnostics
-        const safeOutput = outputName.replace(/"/g, '\\"')
-        // Start in fullscreen so the mirror occupies the entire target output immediately
-        mirrorProcess.command = ["sh", "-c", "wl-mirror --fullscreen \"" + safeOutput + "\" >/dev/null 2>&1 & echo $!" ]
-        mirrorProcess.running = true
+            isLoading = true
+            justStartedMirror = true
+            lastStartedSource = outputName
+            lastMirrorError = ""
+            lastMirrorOutput = ""
+            
+            // Launch wl-mirror in background, echo its PID
+            const safeOutput = outputName.replace(/"/g, '\\"')
+            mirrorProcess.command = ["sh", "-c", "wl-mirror --fullscreen \"" + safeOutput + "\" >/dev/null 2>&1 & echo $!"]
+            mirrorProcess.running = true
+        })
     }
 
-    function stopMirror() {
-        if (activeMirrorPid) {
-            Quickshell.execDetached(["sh", "-c", "kill " + activeMirrorPid + " 2>/dev/null" ])
-            setActiveMirrorPid("")
-            setMirrorRunning(false)
-            Quickshell.execDetached(["sh", "-c", "notify-send 'Display Mirror' 'Mirror stopped' -u low"])
+    function stopMirror(pid) {
+        if (pid && MirrorState.activeMirrors[pid]) {
+            const mirror = MirrorState.activeMirrors[pid]
+            console.log("MonitorMirror: Stopping mirror PID", pid, "source:", mirror.source, "target:", mirror.target)
+            Quickshell.execDetached(["sh", "-c", "kill " + pid + " 2>/dev/null"])
+            removeMirror(pid)
+            Quickshell.execDetached(["sh", "-c", "notify-send 'Display Mirror' 'Stopped mirroring " + mirror.source + " → " + mirror.target + "' -u low"])
         }
+    }
+    
+    function stopAllMirrors() {
+        console.log("MonitorMirror: Stopping all mirrors")
+        const pids = Object.keys(activeMirrors)
+        for (let i = 0; i < pids.length; i++) {
+            const pid = pids[i]
+            Quickshell.execDetached(["sh", "-c", "kill " + pid + " 2>/dev/null"])
+        }
+        MirrorState.activeMirrors = {}
+        activeMirrors = {}
+        Quickshell.execDetached(["sh", "-c", "notify-send 'Display Mirror' 'All mirrors stopped' -u low"])
     }
 
     function checkMirrorStatus() {
-        console.log("MonitorMirror: Checking mirror status, activeMirrorPid:", activeMirrorPid)
-        if (activeMirrorPid) {
-            verifyMirrorProcess.command = ["sh", "-c", "ps -p " + activeMirrorPid + " -o pid= || true"]
+        console.log("MonitorMirror: Checking status of", activeMirrorCount, "mirrors")
+        const pids = Object.keys(activeMirrors)
+        for (let i = 0; i < pids.length; i++) {
+            const pid = pids[i]
+            verifyMirrorProcess.command = ["sh", "-c", "ps -p " + pid + " -o pid= || true"]
+            verifyMirrorProcess.tag = pid  // Store which PID we're checking
             verifyMirrorProcess.running = true
-        } else {
-            console.log("MonitorMirror: No active PID to check")
         }
     }
 
@@ -186,21 +250,29 @@ PluginComponent {
 
         stdout: SplitParser {
             onRead: data => {
-                root.setActiveMirrorPid(data.trim())
-                lastMirrorOutput = data.trim()
+                const pid = data.trim()
+                lastMirrorOutput = pid
+                // Add mirror with source and target we just started
+                if (lastStartedSource && pid && currentFocusedOutput) {
+                    root.addMirror(pid, lastStartedSource, currentFocusedOutput)
+                }
             }
         }
 
         onExited: (exitCode, exitStatus) => {
             root.isLoading = false
-            if (root.activeMirrorPid) {
+            const pid = lastMirrorOutput
+            if (pid && lastStartedSource) {
                 // Verify the process actually exists
-                verifyMirrorProcess.command = ["sh", "-c", "ps -p " + root.activeMirrorPid + " -o pid= || true" ]
+                verifyMirrorProcess.command = ["sh", "-c", "ps -p " + pid + " -o pid= || true"]
+                verifyMirrorProcess.tag = pid
                 verifyMirrorProcess.running = true
             } else if (exitCode !== 0) {
                 console.warn("MonitorMirror: Failed to start mirror, exit code:", exitCode)
                 lastMirrorError = "Failed to start wl-mirror (exit " + exitCode + ")"
                 Quickshell.execDetached(["sh", "-c", "notify-send 'Display Mirror' 'Failed to start mirror' -u critical"])
+                justStartedMirror = false
+                lastStartedSource = ""
             }
         }
     }
@@ -209,24 +281,35 @@ PluginComponent {
         id: verifyMirrorProcess
         command: ["sh", "-c", ""]
         running: false
+        property string tag: ""  // Store which PID we're verifying
+        
         stdout: SplitParser {
             onRead: data => {
                 const exists = data.trim().length > 0
-                console.log("MonitorMirror: Verify result - PID exists:", exists, "data:", data.trim())
-                root.setMirrorRunning(exists)
-                if (exists && root.justStartedMirror) {
-                    // Only send notification when we actually started a mirror, not when checking status
-                    Quickshell.execDetached(["sh", "-c", "notify-send 'Display Mirror' 'Mirror started (PID " + root.activeMirrorPid + ")' -u low"])
+                const pid = verifyMirrorProcess.tag
+                console.log("MonitorMirror: Verify result for PID", pid, "- exists:", exists)
+                
+                if (exists && root.justStartedMirror && pid === root.lastMirrorOutput) {
+                    // Only send notification when we actually started a mirror
+                    const mirror = MirrorState.activeMirrors[pid]
+                    if (mirror) {
+                        Quickshell.execDetached(["sh", "-c", "notify-send 'Display Mirror' 'Now mirroring " + mirror.source + " → " + mirror.target + "' -u low"])
+                    }
                     root.justStartedMirror = false
+                    root.lastStartedSource = ""
                 } else if (!exists) {
-                    if (root.justStartedMirror) {
+                    if (root.justStartedMirror && pid === root.lastMirrorOutput) {
                         lastMirrorError = "wl-mirror process vanished immediately"
                         Quickshell.execDetached(["sh", "-c", "notify-send 'Display Mirror' 'Mirror failed (no process)' -u critical"])
                         root.justStartedMirror = false
+                        root.lastStartedSource = ""
                     } else {
                         lastMirrorError = "wl-mirror process vanished"
                     }
-                    root.setActiveMirrorPid("")
+                    // Remove the dead mirror
+                    if (pid) {
+                        root.removeMirror(pid)
+                    }
                 }
             }
         }
@@ -237,13 +320,13 @@ PluginComponent {
         Row {
             spacing: Theme.spacingXS
             DankIcon {
-                name: root.activeMirrorPid ? "screen_share" : "monitor"
+                name: root.hasActiveMirrors ? "screen_share" : "monitor"
                 size: Theme.iconSize - 6
-                color: root.activeMirrorPid ? Theme.primary : Theme.surfaceVariantText
+                color: root.hasActiveMirrors ? Theme.primary : Theme.surfaceVariantText
                 anchors.verticalCenter: parent.verticalCenter
             }
             StyledText {
-                text: root.activeMirrorPid ? "Mirroring" : (filteredMonitors().length + " mon")
+                text: root.hasActiveMirrors ? (root.activeMirrorCount + " active") : (filteredMonitors().length + " mon")
                 font.pixelSize: Theme.fontSizeSmall
                 font.weight: Font.Medium
                 color: Theme.surfaceVariantText
@@ -256,13 +339,13 @@ PluginComponent {
         Column {
             spacing: Theme.spacingXS
             DankIcon {
-                name: root.activeMirrorPid ? "screen_share" : "monitor"
+                name: root.hasActiveMirrors ? "screen_share" : "monitor"
                 size: Theme.iconSize - 6
-                color: root.activeMirrorPid ? Theme.primary : Theme.surfaceVariantText
+                color: root.hasActiveMirrors ? Theme.primary : Theme.surfaceVariantText
                 anchors.horizontalCenter: parent.horizontalCenter
             }
             StyledText {
-                text: root.activeMirrorPid ? "On" : (filteredMonitors().length + "m")
+                text: root.hasActiveMirrors ? root.activeMirrorCount : (filteredMonitors().length + "m")
                 font.pixelSize: Theme.fontSizeSmall
                 font.weight: Font.Medium
                 color: Theme.surfaceVariantText
@@ -299,11 +382,11 @@ PluginComponent {
                     }
 
                     DankButton {
-                        text: "Stop Mirror"
+                        text: "Stop All Mirrors"
                         iconName: "stop"
-                        onClicked: root.stopMirror()
-                        enabled: root.activeMirrorPid !== ""
-                        visible: root.activeMirrorPid !== ""
+                        onClicked: root.stopAllMirrors()
+                        enabled: root.hasActiveMirrors
+                        visible: root.hasActiveMirrors
                     }
                 }
 
@@ -458,66 +541,113 @@ PluginComponent {
                     }
                 }
 
-                // Active mirror status / diagnostics
+                // Active mirrors - one box per mirror
+                Column {
+                    width: parent.width
+                    spacing: Theme.spacingS
+                    visible: root.hasActiveMirrors
+
+                    Repeater {
+                        model: Object.keys(root.activeMirrors)
+
+                        delegate: StyledRect {
+                            required property var modelData
+                            required property int index
+                            
+                            width: parent.width
+                            height: mirrorStatusRow.implicitHeight + Theme.spacingM * 2
+                            radius: Theme.cornerRadius
+                            color: Theme.primaryContainer
+
+                            Row {
+                                id: mirrorStatusRow
+                                anchors.fill: parent
+                                anchors.margins: Theme.spacingM
+                                spacing: Theme.spacingM
+
+                                DankIcon {
+                                    name: "screen_share"
+                                    size: Theme.iconSize
+                                    color: Theme.onPrimaryContainer || Theme.surfaceText
+                                    anchors.verticalCenter: parent.verticalCenter
+                                }
+
+                                Column {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    width: parent.width - Theme.iconSize - stopButton.width - Theme.spacingM * 3
+                                    spacing: Theme.spacingXS
+                                    
+                                    StyledText {
+                                        text: {
+                                            const mirror = root.activeMirrors[modelData]
+                                            return mirror ? (mirror.source + " → " + mirror.target) : "Unknown"
+                                        }
+                                        font.pixelSize: Theme.fontSizeMedium
+                                        font.weight: Font.Medium
+                                        color: Theme.onPrimaryContainer || Theme.surfaceText
+                                    }
+                                    
+                                    StyledText {
+                                        text: "PID: " + modelData
+                                        font.pixelSize: Theme.fontSizeSmall
+                                        color: Theme.onPrimaryContainer || Theme.surfaceVariantText
+                                        opacity: 0.7
+                                    }
+                                }
+
+                                Item {
+                                    width: 1
+                                    height: 1
+                                }
+
+                                DankButton {
+                                    id: stopButton
+                                    text: "Stop"
+                                    iconName: "stop"
+                                    onClicked: root.stopMirror(modelData)
+                                    anchors.verticalCenter: parent.verticalCenter
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Error display (if any)
                 StyledRect {
                     width: parent.width
-                    height: statusColumnPopout.implicitHeight + Theme.spacingM * 2
+                    height: errorColumn.implicitHeight + Theme.spacingM * 2
                     radius: Theme.cornerRadius
-                    color: root.mirrorRunning ? Theme.primaryContainer : Theme.surfaceContainerHigh
-                    visible: root.activeMirrorPid !== "" || root.lastMirrorError !== ""
+                    color: Theme.surfaceContainerHigh
+                    visible: root.lastMirrorError !== ""
 
                     Column {
-                        id: statusColumnPopout
+                        id: errorColumn
                         anchors.fill: parent
                         anchors.margins: Theme.spacingM
                         spacing: Theme.spacingS
 
                         Row {
-                            width: parent.width
                             spacing: Theme.spacingM
 
                             DankIcon {
-                                name: root.mirrorRunning ? "screen_share" : "error"
+                                name: "error"
                                 size: Theme.iconSize
-                                color: root.mirrorRunning ? (Theme.onPrimaryContainer || Theme.surfaceText) : (Theme.warning || Theme.error)
+                                color: Theme.warning || Theme.error
                                 anchors.verticalCenter: parent.verticalCenter
                             }
 
-                            Column {
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: parent.width - Theme.iconSize - stopMirrorButton.width - Theme.spacingM * 3
-                                
-                                StyledText {
-                                    text: root.mirrorRunning ? "Mirror Active (PID " + root.activeMirrorPid + ")" : (root.lastMirrorError || "Mirror Not Running")
-                                    font.pixelSize: Theme.fontSizeMedium
-                                    font.weight: Font.Medium
-                                    color: root.mirrorRunning ? (Theme.onPrimaryContainer || Theme.surfaceText) : Theme.surfaceText
-                                }
-                            }
-
-                            Item {
-                                width: 1
-                                height: 1
-                            }
-
-                            DankButton {
-                                id: stopMirrorButton
-                                text: "Stop"
-                                iconName: "stop"
-                                onClicked: root.stopMirror()
-                                visible: root.mirrorRunning
-                                anchors.verticalCenter: parent.verticalCenter
-                                
-                                Component.onCompleted: {
-                                    console.log("MonitorMirror: Popout Stop button created. mirrorRunning:", root.mirrorRunning, "visible:", visible)
-                                }
+                            StyledText {
+                                text: "Mirror Error"
+                                font.pixelSize: Theme.fontSizeMedium
+                                font.weight: Font.Medium
+                                color: Theme.surfaceText
                             }
                         }
 
                         StyledText {
-                            text: root.mirrorRunning ? "A display is currently being mirrored." : "Attempted to start mirror. " + (root.lastMirrorError || "Unknown issue.")
+                            text: root.lastMirrorError
                             font.pixelSize: Theme.fontSizeSmall
-                            color: root.mirrorRunning ? (Theme.onPrimaryContainer || Theme.surfaceText) : Theme.surfaceVariantText
+                            color: Theme.surfaceVariantText
                             wrapMode: Text.WordWrap
                             leftPadding: Theme.iconSize + Theme.spacingM
                             width: parent.width - Theme.spacingM * 2
@@ -644,9 +774,9 @@ PluginComponent {
                 // Info text (CC detail)
                 StyledText {
                     width: parent.width - Theme.spacingM * 2
-                    text: root.mirrorRunning ? "A mirror is already active. Stop it before starting a new one." : (currentFocusedOutput ? "Current display (" + currentFocusedOutput + ") is hidden. Select another display to mirror:" : "Select a display to mirror:")
+                    text: hasActiveMirrors ? (activeMirrorCount + " display" + (activeMirrorCount > 1 ? "s" : "") + " currently being mirrored. Click a display to start/stop mirroring.") : (currentFocusedOutput ? "Current display (" + currentFocusedOutput + ") is hidden. Select displays to mirror:" : "Select displays to mirror:")
                     font.pixelSize: Theme.fontSizeSmall
-                    color: root.mirrorRunning ? Theme.warning : Theme.surfaceVariantText
+                    color: Theme.surfaceVariantText
                     wrapMode: Text.WordWrap
                     visible: filteredMonitors().length > 0 && !root.isLoading
                     bottomPadding: Theme.spacingS
@@ -664,12 +794,12 @@ PluginComponent {
                         delegate: Rectangle {
                             required property var modelData
                             required property int index
+                            
                             width: parent.width
                             height: 60
                             radius: Theme.cornerRadius
-                            opacity: root.mirrorRunning ? 0.5 : 1.0
-                            color: monitorArea.containsMouse && !root.mirrorRunning ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.08) : Theme.withAlpha(Theme.surfaceContainerHighest, Theme.popupTransparency)
-                            border.color: Theme.primary
+                            color: monitorArea.containsMouse ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.08) : Theme.withAlpha(Theme.surfaceContainerHighest, Theme.popupTransparency)
+                            border.color: Theme.outline
                             border.width: 0
 
                             Row {
@@ -680,50 +810,42 @@ PluginComponent {
                                 DankIcon {
                                     name: "monitor"
                                     size: Theme.iconSize + 8
-                                    color: root.mirrorRunning ? Theme.surfaceVariantText : Theme.primary
+                                    color: Theme.primary
                                     anchors.verticalCenter: parent.verticalCenter
                                 }
 
                                 Column {
                                     anchors.verticalCenter: parent.verticalCenter
                                     spacing: Theme.spacingXS
+                                    width: parent.width - Theme.iconSize - Theme.spacingM * 2
 
                                     StyledText {
                                         text: modelData
                                         font.pixelSize: Theme.fontSizeMedium
                                         font.weight: Font.Medium
-                                        color: root.mirrorRunning ? Theme.surfaceVariantText : Theme.surfaceText
+                                        color: Theme.surfaceText
                                     }
 
                                     StyledText {
-                                        text: root.mirrorRunning ? "Stop current mirror first" : "Click to mirror this output"
+                                        text: "Click to start mirroring"
                                         font.pixelSize: Theme.fontSizeSmall
                                         color: Theme.surfaceVariantText
                                     }
                                 }
 
                                 Item {
-                                    Layout.fillWidth: true
-                                }
-
-                                DankIcon {
-                                    name: root.mirrorRunning ? "block" : "arrow_forward"
-                                    size: Theme.iconSize
-                                    color: Theme.surfaceVariantText
-                                    anchors.verticalCenter: parent.verticalCenter
+                                    width: 1
+                                    height: 1
                                 }
                             }
 
                             MouseArea {
                                 id: monitorArea
                                 anchors.fill: parent
-                                enabled: !root.mirrorRunning
-                                hoverEnabled: !root.mirrorRunning
-                                cursorShape: root.mirrorRunning ? Qt.ForbiddenCursor : Qt.PointingHandCursor
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
                                 onClicked: {
-                                    if (!root.mirrorRunning) {
-                                        root.startMirror(modelData)
-                                    }
+                                    root.startMirror(modelData)
                                 }
                             }
                         }
@@ -765,69 +887,113 @@ PluginComponent {
                     }
                 }
 
-                // Active mirror status / diagnostics
-                StyledRect {
+                // Active mirror status boxes (one per mirror)
+                Column {
                     width: parent.width
-                    height: statusColumnCCDetail.implicitHeight + Theme.spacingM * 2
-                    radius: Theme.cornerRadius
-                    color: root.mirrorRunning ? Theme.primaryContainer : Theme.surfaceContainerHigh
-                    visible: root.activeMirrorPid !== "" || root.lastMirrorError !== ""
-
-                    Column {
-                        id: statusColumnCCDetail
-                        anchors.fill: parent
-                        anchors.margins: Theme.spacingM
-                        spacing: Theme.spacingS
-
-                        Row {
+                    spacing: Theme.spacingS
+                    
+                    Repeater {
+                        model: Object.keys(root.activeMirrors)
+                        
+                        delegate: StyledRect {
                             width: parent.width
-                            spacing: Theme.spacingM
-
-                            DankIcon {
-                                name: root.mirrorRunning ? "screen_share" : "error"
-                                size: Theme.iconSize
-                                color: root.mirrorRunning ? (Theme.onPrimaryContainer || Theme.surfaceText) : (Theme.warning || Theme.error)
-                                anchors.verticalCenter: parent.verticalCenter
-                            }
-
-                            Column {
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: parent.width - Theme.iconSize - stopMirrorButtonCC.width - Theme.spacingM * 3
+                            height: mirrorRowCCDetail.implicitHeight + Theme.spacingM * 2
+                            radius: Theme.cornerRadius
+                            color: Theme.primaryContainer
+                            
+                            Row {
+                                id: mirrorRowCCDetail
+                                anchors.fill: parent
+                                anchors.margins: Theme.spacingM
+                                spacing: Theme.spacingM
                                 
-                                StyledText {
-                                    text: root.mirrorRunning ? "Mirror Active (PID " + root.activeMirrorPid + ")" : (root.lastMirrorError || "Mirror Not Running")
-                                    font.pixelSize: Theme.fontSizeMedium
-                                    font.weight: Font.Medium
-                                    color: root.mirrorRunning ? (Theme.onPrimaryContainer || Theme.surfaceText) : Theme.surfaceText
+                                DankIcon {
+                                    name: "screen_share"
+                                    size: Theme.iconSize
+                                    color: Theme.onPrimaryContainer || Theme.surfaceText
+                                    anchors.verticalCenter: parent.verticalCenter
                                 }
-                            }
-
-                            Item {
-                                width: 1
-                                height: 1
-                            }
-
-                            DankButton {
-                                id: stopMirrorButtonCC
-                                text: "Stop"
-                                iconName: "stop"
-                                onClicked: root.stopMirror()
-                                visible: root.mirrorRunning
-                                anchors.verticalCenter: parent.verticalCenter
                                 
-                                Component.onCompleted: {
-                                    console.log("MonitorMirror: CC Detail Stop button created. mirrorRunning:", root.mirrorRunning, "visible:", visible)
+                                Column {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    width: parent.width - Theme.iconSize - stopButtonCCDetail.width - Theme.spacingM * 3
+                                    
+                                    StyledText {
+                                        text: {
+                                            const mirror = root.activeMirrors[modelData]
+                                            return mirror ? (mirror.source + " → " + mirror.target) : "Unknown"
+                                        }
+                                        font.pixelSize: Theme.fontSizeMedium
+                                        font.weight: Font.Medium
+                                        color: Theme.onPrimaryContainer || Theme.surfaceText
+                                    }
+                                    
+                                    StyledText {
+                                        text: "PID: " + modelData
+                                        font.pixelSize: Theme.fontSizeSmall
+                                        color: Theme.onPrimaryContainer || Theme.surfaceText
+                                        opacity: 0.7
+                                    }
+                                }
+                                
+                                Item {
+                                    width: 1
+                                    height: 1
+                                }
+                                
+                                DankButton {
+                                    id: stopButtonCCDetail
+                                    text: "Stop"
+                                    iconName: "stop"
+                                    onClicked: root.stopMirror(modelData)
+                                    anchors.verticalCenter: parent.verticalCenter
                                 }
                             }
                         }
-
-                        StyledText {
-                            text: root.mirrorRunning ? "A display is currently being mirrored." : "Attempted to start mirror. " + (root.lastMirrorError || "Unknown issue.")
-                            font.pixelSize: Theme.fontSizeSmall
-                            color: root.mirrorRunning ? (Theme.onPrimaryContainer || Theme.surfaceText) : Theme.surfaceVariantText
-                            wrapMode: Text.WordWrap
-                            leftPadding: Theme.iconSize + Theme.spacingM
-                            width: parent.width - Theme.spacingM * 2
+                    }
+                    
+                    // Error display
+                    StyledRect {
+                        width: parent.width
+                        height: errorColumnCCDetail.implicitHeight + Theme.spacingM * 2
+                        radius: Theme.cornerRadius
+                        color: Theme.surfaceContainerHigh
+                        visible: root.lastMirrorError !== ""
+                        
+                        Column {
+                            id: errorColumnCCDetail
+                            anchors.fill: parent
+                            anchors.margins: Theme.spacingM
+                            spacing: Theme.spacingS
+                            
+                            Row {
+                                width: parent.width
+                                spacing: Theme.spacingM
+                                
+                                DankIcon {
+                                    name: "error"
+                                    size: Theme.iconSize
+                                    color: Theme.warning || Theme.error
+                                    anchors.verticalCenter: parent.verticalCenter
+                                }
+                                
+                                StyledText {
+                                    text: "Mirror Error"
+                                    font.pixelSize: Theme.fontSizeMedium
+                                    font.weight: Font.Medium
+                                    color: Theme.surfaceText
+                                    anchors.verticalCenter: parent.verticalCenter
+                                }
+                            }
+                            
+                            StyledText {
+                                text: "Attempted to start mirror. " + (root.lastMirrorError || "Unknown issue.")
+                                font.pixelSize: Theme.fontSizeSmall
+                                color: Theme.surfaceVariantText
+                                wrapMode: Text.WordWrap
+                                leftPadding: Theme.iconSize + Theme.spacingM
+                                width: parent.width - Theme.spacingM * 2
+                            }
                         }
                     }
                 }
