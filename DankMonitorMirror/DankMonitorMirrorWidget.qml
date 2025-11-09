@@ -461,18 +461,19 @@ PluginComponent {
                 // Active mirror status / diagnostics
                 StyledRect {
                     width: parent.width
-                    height: statusColumn.implicitHeight + Theme.spacingM * 2
+                    height: statusColumnPopout.implicitHeight + Theme.spacingM * 2
                     radius: Theme.cornerRadius
                     color: root.mirrorRunning ? Theme.primaryContainer : Theme.surfaceContainerHigh
                     visible: root.activeMirrorPid !== "" || root.lastMirrorError !== ""
 
                     Column {
-                        id: statusColumn
+                        id: statusColumnPopout
                         anchors.fill: parent
                         anchors.margins: Theme.spacingM
                         spacing: Theme.spacingS
 
                         Row {
+                            width: parent.width
                             spacing: Theme.spacingM
 
                             DankIcon {
@@ -482,17 +483,39 @@ PluginComponent {
                                 anchors.verticalCenter: parent.verticalCenter
                             }
 
-                            StyledText {
-                                text: root.mirrorRunning ? "Mirror Active (PID " + root.activeMirrorPid + ")" : (root.lastMirrorError || "Mirror Not Running")
-                                font.pixelSize: Theme.fontSizeMedium
-                                font.weight: Font.Medium
-                                color: root.mirrorRunning ? (Theme.onPrimaryContainer || Theme.surfaceText) : Theme.surfaceText
+                            Column {
                                 anchors.verticalCenter: parent.verticalCenter
+                                width: parent.width - Theme.iconSize - stopMirrorButton.width - Theme.spacingM * 3
+                                
+                                StyledText {
+                                    text: root.mirrorRunning ? "Mirror Active (PID " + root.activeMirrorPid + ")" : (root.lastMirrorError || "Mirror Not Running")
+                                    font.pixelSize: Theme.fontSizeMedium
+                                    font.weight: Font.Medium
+                                    color: root.mirrorRunning ? (Theme.onPrimaryContainer || Theme.surfaceText) : Theme.surfaceText
+                                }
+                            }
+
+                            Item {
+                                width: 1
+                                height: 1
+                            }
+
+                            DankButton {
+                                id: stopMirrorButton
+                                text: "Stop"
+                                iconName: "stop"
+                                onClicked: root.stopMirror()
+                                visible: root.mirrorRunning
+                                anchors.verticalCenter: parent.verticalCenter
+                                
+                                Component.onCompleted: {
+                                    console.log("MonitorMirror: Popout Stop button created. mirrorRunning:", root.mirrorRunning, "visible:", visible)
+                                }
                             }
                         }
 
                         StyledText {
-                            text: root.mirrorRunning ? "A display is currently being mirrored. Click 'Stop' to end the session." : "Attempted to start mirror. " + (root.lastMirrorError || "Unknown issue.")
+                            text: root.mirrorRunning ? "A display is currently being mirrored." : "Attempted to start mirror. " + (root.lastMirrorError || "Unknown issue.")
                             font.pixelSize: Theme.fontSizeSmall
                             color: root.mirrorRunning ? (Theme.onPrimaryContainer || Theme.surfaceText) : Theme.surfaceVariantText
                             wrapMode: Text.WordWrap
@@ -547,7 +570,7 @@ PluginComponent {
                 }
 
                 Item {
-                    width: Math.max(0, parent.width - headerText.implicitWidth - refreshButton.width - stopButton.width - Theme.spacingS - Theme.spacingM)
+                    width: Math.max(0, parent.width - headerText.implicitWidth - refreshButton.width - Theme.spacingM)
                     height: parent.height
                 }
 
@@ -561,27 +584,6 @@ PluginComponent {
                     }
                     enabled: !root.isLoading
                     anchors.verticalCenter: parent.verticalCenter
-                }
-
-                DankButton {
-                    id: stopButton
-                    text: "Stop"
-                    iconName: "stop"
-                    onClicked: root.stopMirror()
-                    enabled: root.activeMirrorPid !== ""
-                    visible: true
-                    anchors.verticalCenter: parent.verticalCenter
-                    
-                    Component.onCompleted: {
-                        console.log("MonitorMirror: Stop button loaded. enabled:", enabled, "activeMirrorPid:", root.activeMirrorPid)
-                    }
-                    
-                    Connections {
-                        target: root
-                        function onActiveMirrorPidChanged() {
-                            console.log("MonitorMirror: Stop button sees activeMirrorPid change:", root.activeMirrorPid, "enabled will be:", root.activeMirrorPid !== "")
-                        }
-                    }
                 }
             }
 
@@ -642,9 +644,9 @@ PluginComponent {
                 // Info text (CC detail)
                 StyledText {
                     width: parent.width - Theme.spacingM * 2
-                    text: currentFocusedOutput ? "Current display (" + currentFocusedOutput + ") is hidden. Select another display to mirror:" : "Select a display to mirror:"
+                    text: root.mirrorRunning ? "A mirror is already active. Stop it before starting a new one." : (currentFocusedOutput ? "Current display (" + currentFocusedOutput + ") is hidden. Select another display to mirror:" : "Select a display to mirror:")
                     font.pixelSize: Theme.fontSizeSmall
-                    color: Theme.surfaceVariantText
+                    color: root.mirrorRunning ? Theme.warning : Theme.surfaceVariantText
                     wrapMode: Text.WordWrap
                     visible: filteredMonitors().length > 0 && !root.isLoading
                     bottomPadding: Theme.spacingS
@@ -665,7 +667,8 @@ PluginComponent {
                             width: parent.width
                             height: 60
                             radius: Theme.cornerRadius
-                            color: monitorArea.containsMouse ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.08) : Theme.withAlpha(Theme.surfaceContainerHighest, Theme.popupTransparency)
+                            opacity: root.mirrorRunning ? 0.5 : 1.0
+                            color: monitorArea.containsMouse && !root.mirrorRunning ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.08) : Theme.withAlpha(Theme.surfaceContainerHighest, Theme.popupTransparency)
                             border.color: Theme.primary
                             border.width: 0
 
@@ -677,7 +680,7 @@ PluginComponent {
                                 DankIcon {
                                     name: "monitor"
                                     size: Theme.iconSize + 8
-                                    color: Theme.primary
+                                    color: root.mirrorRunning ? Theme.surfaceVariantText : Theme.primary
                                     anchors.verticalCenter: parent.verticalCenter
                                 }
 
@@ -689,11 +692,11 @@ PluginComponent {
                                         text: modelData
                                         font.pixelSize: Theme.fontSizeMedium
                                         font.weight: Font.Medium
-                                        color: Theme.surfaceText
+                                        color: root.mirrorRunning ? Theme.surfaceVariantText : Theme.surfaceText
                                     }
 
                                     StyledText {
-                                        text: "Click to mirror this output"
+                                        text: root.mirrorRunning ? "Stop current mirror first" : "Click to mirror this output"
                                         font.pixelSize: Theme.fontSizeSmall
                                         color: Theme.surfaceVariantText
                                     }
@@ -704,7 +707,7 @@ PluginComponent {
                                 }
 
                                 DankIcon {
-                                    name: "arrow_forward"
+                                    name: root.mirrorRunning ? "block" : "arrow_forward"
                                     size: Theme.iconSize
                                     color: Theme.surfaceVariantText
                                     anchors.verticalCenter: parent.verticalCenter
@@ -714,10 +717,13 @@ PluginComponent {
                             MouseArea {
                                 id: monitorArea
                                 anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
+                                enabled: !root.mirrorRunning
+                                hoverEnabled: !root.mirrorRunning
+                                cursorShape: root.mirrorRunning ? Qt.ForbiddenCursor : Qt.PointingHandCursor
                                 onClicked: {
-                                    root.startMirror(modelData)
+                                    if (!root.mirrorRunning) {
+                                        root.startMirror(modelData)
+                                    }
                                 }
                             }
                         }
@@ -762,18 +768,19 @@ PluginComponent {
                 // Active mirror status / diagnostics
                 StyledRect {
                     width: parent.width
-                    height: statusColumn.implicitHeight + Theme.spacingM * 2
+                    height: statusColumnCCDetail.implicitHeight + Theme.spacingM * 2
                     radius: Theme.cornerRadius
                     color: root.mirrorRunning ? Theme.primaryContainer : Theme.surfaceContainerHigh
                     visible: root.activeMirrorPid !== "" || root.lastMirrorError !== ""
 
                     Column {
-                        id: statusColumn
+                        id: statusColumnCCDetail
                         anchors.fill: parent
                         anchors.margins: Theme.spacingM
                         spacing: Theme.spacingS
 
                         Row {
+                            width: parent.width
                             spacing: Theme.spacingM
 
                             DankIcon {
@@ -783,17 +790,39 @@ PluginComponent {
                                 anchors.verticalCenter: parent.verticalCenter
                             }
 
-                            StyledText {
-                                text: root.mirrorRunning ? "Mirror Active (PID " + root.activeMirrorPid + ")" : (root.lastMirrorError || "Mirror Not Running")
-                                font.pixelSize: Theme.fontSizeMedium
-                                font.weight: Font.Medium
-                                color: root.mirrorRunning ? (Theme.onPrimaryContainer || Theme.surfaceText) : Theme.surfaceText
+                            Column {
                                 anchors.verticalCenter: parent.verticalCenter
+                                width: parent.width - Theme.iconSize - stopMirrorButtonCC.width - Theme.spacingM * 3
+                                
+                                StyledText {
+                                    text: root.mirrorRunning ? "Mirror Active (PID " + root.activeMirrorPid + ")" : (root.lastMirrorError || "Mirror Not Running")
+                                    font.pixelSize: Theme.fontSizeMedium
+                                    font.weight: Font.Medium
+                                    color: root.mirrorRunning ? (Theme.onPrimaryContainer || Theme.surfaceText) : Theme.surfaceText
+                                }
+                            }
+
+                            Item {
+                                width: 1
+                                height: 1
+                            }
+
+                            DankButton {
+                                id: stopMirrorButtonCC
+                                text: "Stop"
+                                iconName: "stop"
+                                onClicked: root.stopMirror()
+                                visible: root.mirrorRunning
+                                anchors.verticalCenter: parent.verticalCenter
+                                
+                                Component.onCompleted: {
+                                    console.log("MonitorMirror: CC Detail Stop button created. mirrorRunning:", root.mirrorRunning, "visible:", visible)
+                                }
                             }
                         }
 
                         StyledText {
-                            text: root.mirrorRunning ? "A display is currently being mirrored. Click 'Stop' to end the session." : "Attempted to start mirror. " + (root.lastMirrorError || "Unknown issue.")
+                            text: root.mirrorRunning ? "A display is currently being mirrored." : "Attempted to start mirror. " + (root.lastMirrorError || "Unknown issue.")
                             font.pixelSize: Theme.fontSizeSmall
                             color: root.mirrorRunning ? (Theme.onPrimaryContainer || Theme.surfaceText) : Theme.surfaceVariantText
                             wrapMode: Text.WordWrap
