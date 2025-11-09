@@ -463,16 +463,18 @@ PluginComponent {
                     Repeater {
                         model: Object.keys(MirrorState.activeMirrors)
 
-                        delegate: StyledRect {
+                        delegate: Rectangle {
                             required property var modelData
                             required property int index
                             
                             width: parent.width
                             height: mirrorStatusRow.implicitHeight + Theme.spacingM * 2
                             radius: Theme.cornerRadius
-                            color: Theme.primaryContainer
+                            color: Theme.primaryPressed
+                            border.width: 2
+                            border.color: Theme.primary
 
-                            Row {
+                            RowLayout {
                                 id: mirrorStatusRow
                                 anchors.fill: parent
                                 anchors.margins: Theme.spacingM
@@ -481,14 +483,14 @@ PluginComponent {
                                 DankIcon {
                                     name: "screen_share"
                                     size: Theme.iconSize
-                                    color: Theme.onPrimaryContainer || Theme.surfaceText
-                                    anchors.verticalCenter: parent.verticalCenter
+                                    color: Theme.primary
+                                    Layout.alignment: Qt.AlignVCenter
                                 }
 
                                 Column {
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    width: parent.width - Theme.iconSize - stopButton.width - Theme.spacingM * 3
-                                    spacing: Theme.spacingXS
+                                    spacing: 2
+                                    Layout.alignment: Qt.AlignVCenter
+                                    Layout.fillWidth: true
                                     
                                     StyledText {
                                         text: {
@@ -497,20 +499,17 @@ PluginComponent {
                                         }
                                         font.pixelSize: Theme.fontSizeMedium
                                         font.weight: Font.Medium
-                                        color: Theme.onPrimaryContainer || Theme.surfaceText
+                                        color: Theme.primary
+                                        elide: Text.ElideRight
+                                        wrapMode: Text.NoWrap
+                                        width: parent.width
                                     }
                                     
                                     StyledText {
                                         text: "PID: " + modelData
                                         font.pixelSize: Theme.fontSizeSmall
-                                        color: Theme.onPrimaryContainer || Theme.surfaceVariantText
-                                        opacity: 0.7
+                                        color: Theme.surfaceTextMedium
                                     }
-                                }
-
-                                Item {
-                                    width: 1
-                                    height: 1
                                 }
 
                                 DankButton {
@@ -518,7 +517,7 @@ PluginComponent {
                                     text: "Stop"
                                     iconName: "stop"
                                     onClicked: root.stopMirror(modelData)
-                                    anchors.verticalCenter: parent.verticalCenter
+                                    Layout.alignment: Qt.AlignVCenter
                                 }
                             }
                         }
@@ -933,13 +932,18 @@ PluginComponent {
                     Repeater {
                         model: Object.keys(MirrorState.activeMirrors)
                         
-                        delegate: StyledRect {
+                        delegate: Rectangle {
+                            required property var modelData
+                            required property int index
+                            
                             width: parent.width
                             height: mirrorRowCCDetail.implicitHeight + Theme.spacingM * 2
                             radius: Theme.cornerRadius
-                            color: Theme.primaryContainer
+                            color: Theme.primaryPressed
+                            border.width: 2
+                            border.color: Theme.primary
                             
-                            Row {
+                            RowLayout {
                                 id: mirrorRowCCDetail
                                 anchors.fill: parent
                                 anchors.margins: Theme.spacingM
@@ -948,13 +952,14 @@ PluginComponent {
                                 DankIcon {
                                     name: "screen_share"
                                     size: Theme.iconSize
-                                    color: Theme.onPrimaryContainer || Theme.surfaceText
-                                    anchors.verticalCenter: parent.verticalCenter
+                                    color: Theme.primary
+                                    Layout.alignment: Qt.AlignVCenter
                                 }
                                 
                                 Column {
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    width: parent.width - Theme.iconSize - stopButtonCCDetail.width - Theme.spacingM * 3
+                                    spacing: 2
+                                    Layout.alignment: Qt.AlignVCenter
+                                    Layout.fillWidth: true
                                     
                                     StyledText {
                                         text: {
@@ -963,20 +968,17 @@ PluginComponent {
                                         }
                                         font.pixelSize: Theme.fontSizeMedium
                                         font.weight: Font.Medium
-                                        color: Theme.onPrimaryContainer || Theme.surfaceText
+                                        color: Theme.primary
+                                        elide: Text.ElideRight
+                                        wrapMode: Text.NoWrap
+                                        width: parent.width
                                     }
                                     
                                     StyledText {
                                         text: "PID: " + modelData
                                         font.pixelSize: Theme.fontSizeSmall
-                                        color: Theme.onPrimaryContainer || Theme.surfaceText
-                                        opacity: 0.7
+                                        color: Theme.surfaceTextMedium
                                     }
-                                }
-                                
-                                Item {
-                                    width: 1
-                                    height: 1
                                 }
                                 
                                 DankButton {
@@ -984,7 +986,7 @@ PluginComponent {
                                     text: "Stop"
                                     iconName: "stop"
                                     onClicked: root.stopMirror(modelData)
-                                    anchors.verticalCenter: parent.verticalCenter
+                                    Layout.alignment: Qt.AlignVCenter
                                 }
                             }
                         }
