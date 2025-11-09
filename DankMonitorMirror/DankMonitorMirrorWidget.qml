@@ -168,6 +168,10 @@ PluginComponent {
             lastMirrorError = ""
             lastMirrorOutput = ""
             
+            // Close the Control Center using the proper PopoutService API
+            // This prevents CC from staying open below the fullscreen wl-mirror window
+            PopoutService.closeControlCenter()
+            
             // Launch wl-mirror in background, echo its PID
             const safeOutput = outputName.replace(/"/g, '\\"')
             mirrorProcess.command = ["sh", "-c", "wl-mirror --fullscreen \"" + safeOutput + "\" >/dev/null 2>&1 & echo $!"]
@@ -734,7 +738,6 @@ PluginComponent {
             color: Theme.withAlpha(Theme.surfaceContainerHigh, Theme.popupTransparency)
             border.color: Qt.rgba(Theme.outline.r, Theme.outline.g, Theme.outline.b, 0.08)
             border.width: 0
-            visible: true
 
             onVisibleChanged: {
                 if (visible) {
