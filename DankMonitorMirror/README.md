@@ -42,7 +42,7 @@ sudo make install
 1. Clone or copy this plugin to your DankMaterialShell plugins directory:
    ```bash
    mkdir -p ~/.config/DankMaterialShell/plugins
-   cp -r DankMonitorMirror ~/.config/DankMaterialShell/plugins/
+   cp -r DankDisplayMirror ~/.config/DankMaterialShell/plugins/
    ```
 
 2. Restart DankMaterialShell:
@@ -137,10 +137,10 @@ This plugin is built using the DankMaterialShell plugin framework with:
 
 ### File Structure
 ```
-DankMonitorMirror/
+DankDisplayMirror/
 ├── plugin.json                      # Plugin manifest
-├── DankMonitorMirrorWidget.qml      # Main widget component
-├── DankMonitorMirrorSettings.qml    # Settings interface
+├── DankDisplayMirrorWidget.qml      # Main widget component
+├── DankDisplayMirrorSettings.qml    # Settings interface
 └── README.md                        # This file
 ```
 
