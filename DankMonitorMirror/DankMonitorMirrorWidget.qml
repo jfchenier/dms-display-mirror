@@ -20,12 +20,14 @@ PluginComponent {
     
     // Use shared singleton state so all widget instances see the same values
     // activeMirrors structure: {pid: {source: "outputName", target: "outputName"}}
-    property var activeMirrors: MirrorState.activeMirrors
-    property bool hasActiveMirrors: MirrorState.hasActiveMirrors
-    property int activeMirrorCount: MirrorState.activeMirrorCount
+    readonly property var activeMirrors: MirrorState.activeMirrors
+    readonly property bool hasActiveMirrors: MirrorState.hasActiveMirrors
+    readonly property int activeMirrorCount: MirrorState.activeMirrorCount
     property string lastMirrorOutput: ""
     property string lastMirrorError: ""
     property string currentFocusedOutput: ""
+    // Incremented whenever mirror state changes to force dependent bindings to reevaluate
+    property int mirrorVersion: 0
 
     // Helper functions to manage mirrors
     function addMirror(pid, source, target) {
@@ -76,12 +78,26 @@ PluginComponent {
     // Control Center tile properties
     ccWidgetIcon: "screen_share"
     ccWidgetPrimaryText: "Display Mirror"
-    ccWidgetSecondaryText: hasActiveMirrors ? (activeMirrorCount + " mirror" + (activeMirrorCount > 1 ? "s" : "") + " active") : (monitors.length + " outputs")
+    // Secondary text: show count of active mirrors or a clear no-active state
+    // mirrorVersion included indirectly via hasActiveMirrors / activeMirrorCount updates, and explicit bump for reliability
+    ccWidgetSecondaryText: hasActiveMirrors
+        ? (activeMirrorCount + " active mirror" + (activeMirrorCount > 1 ? "s" : ""))
+        : "No active mirror"
     ccWidgetIsActive: hasActiveMirrors
 
     onCcWidgetToggled: {
         if (hasActiveMirrors) {
             stopAllMirrors()
+        }
+    }
+
+    // Listen to singleton changes to ensure tile text & info areas update immediately
+    Connections {
+        target: MirrorState
+        function onMirrorsChanged() {
+            // Force a reevaluation by bumping version counter
+            mirrorVersion++
+            console.log("MonitorMirror: mirrorsChanged received; version=" + mirrorVersion + ", count=" + MirrorState.activeMirrorCount)
         }
     }
 
@@ -92,17 +108,7 @@ PluginComponent {
         checkMirrorStatus()
     }
 
-    // Watch for changes in the singleton to update local properties
-    Connections {
-        target: MirrorState
-        function onMirrorsChanged() {
-            console.log("MonitorMirror: Mirrors changed signal received")
-            // Force property re-evaluation
-            root.activeMirrors = MirrorState.activeMirrors
-            root.hasActiveMirrors = MirrorState.hasActiveMirrors
-            root.activeMirrorCount = MirrorState.activeMirrorCount
-        }
-    }
+    // Removed redundant reassignment Connections; bindings are direct now
 
     Timer {
         id: refreshTimer
@@ -172,19 +178,20 @@ PluginComponent {
     
     function stopAllMirrors() {
         console.log("MonitorMirror: Stopping all mirrors")
-        const pids = Object.keys(activeMirrors)
+        // Always reference MirrorState directly to avoid breaking binding
+        const pids = Object.keys(MirrorState.activeMirrors)
         for (let i = 0; i < pids.length; i++) {
             const pid = pids[i]
             Quickshell.execDetached(["sh", "-c", "kill " + pid + " 2>/dev/null"])
         }
+        // Clear via singleton; do not assign root.activeMirrors which would sever binding
         MirrorState.activeMirrors = {}
-        activeMirrors = {}
         Quickshell.execDetached(["sh", "-c", "notify-send 'Display Mirror' 'All mirrors stopped' -u low"])
     }
 
     function checkMirrorStatus() {
         console.log("MonitorMirror: Checking status of", activeMirrorCount, "mirrors")
-        const pids = Object.keys(activeMirrors)
+    const pids = Object.keys(MirrorState.activeMirrors)
         for (let i = 0; i < pids.length; i++) {
             const pid = pids[i]
             verifyMirrorProcess.command = ["sh", "-c", "ps -p " + pid + " -o pid= || true"]
@@ -561,7 +568,7 @@ PluginComponent {
                     visible: root.hasActiveMirrors
 
                     Repeater {
-                        model: Object.keys(root.activeMirrors)
+                        model: Object.keys(MirrorState.activeMirrors)
 
                         delegate: StyledRect {
                             required property var modelData
@@ -787,7 +794,7 @@ PluginComponent {
                 // Info text (CC detail)
                 StyledText {
                     width: parent.width - Theme.spacingM * 2
-                    text: hasActiveMirrors ? (activeMirrorCount + " display" + (activeMirrorCount > 1 ? "s" : "") + " currently being mirrored. Click a display to start/stop mirroring.") : (currentFocusedOutput ? "Current display (" + currentFocusedOutput + ") is hidden. Select displays to mirror:" : "Select displays to mirror:")
+                    text: hasActiveMirrors ? (activeMirrorCount + " display" + (activeMirrorCount > 1 ? "s" : "") + " currently being mirrored.") : (currentFocusedOutput ? "Choose an output to start mirroring on the current display" : "Select a display to mirror")
                     font.pixelSize: Theme.fontSizeSmall
                     color: Theme.surfaceVariantText
                     wrapMode: Text.WordWrap
@@ -907,7 +914,7 @@ PluginComponent {
                     spacing: Theme.spacingS
                     
                     Repeater {
-                        model: Object.keys(root.activeMirrors)
+                        model: Object.keys(MirrorState.activeMirrors)
                         
                         delegate: StyledRect {
                             width: parent.width
