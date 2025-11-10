@@ -1,21 +1,50 @@
-# Dank Display Mirror
+# Display Mirror
 
-A DankMaterialShell Control Center plugin that provides an easy interface to mirror displays using wl-mirror. This plugin replaces the need for command-line tools like fuzzel by integrating display selection directly into the Control Center.
+A DankMaterialShell plugin that provides an easy interface to mirror niri displays using wl-mirror from the control center and bar.
+
+![Display Mirror Screenshot](https://github.com/jfchenier/dms-display-mirror/blob/main/assets/screenshot.png)
 
 ## Features
 
-- 🖥️ **Easy Display Selection** - Browse available displays from the Control Center
-- 🔄 **Auto-refresh** - Automatically detects monitor changes
-- 🎯 **One-Click Mirroring** - Start mirroring with a single click
-- 🛑 **Quick Stop** - Stop active mirrors instantly
-- ⚙️ **Configurable** - Adjust refresh intervals and auto-detection settings
+- **Easy Display Selection** - Browse available displays directly from the Control Center
+- **Auto-refresh** - Automatically detects monitor changes and updates the display list
+- **One-Click Mirroring** - Start screen mirroring with a single click
+- **Quick Stop** - Stop active mirror sessions instantly
+- **Bar Widget** - Show mirroring status and control from the DankBar
+
+## Installation
+
+### Using DMS CLI
+
+```bash
+dms plugins install displayMirror
+```
+
+### Using DMS Settings
+
+1. Open Settings → Plugins
+2. Click "Browse"
+3. Enable third party plugins
+4. Install and enable Display Mirror
+5. Add "Display Mirror" to your control center widgets
+
+### Manual
+
+```bash
+git clone https://github.com/jfchenier/dms-display-mirror ~/.config/DankMaterialShell/plugins/dms-display-mirror
+```
+
+Then:
+1. Open Settings → Plugins
+2. Click "Scan"
+3. Enable "Display Mirror"
+4. Add to your DankBar or Control Center
 
 ## Requirements
 
-- **DankMaterialShell** - The desktop environment this plugin is designed for
-- **wl-mirror** - The Wayland screen mirroring utility
-- **niri** - The compositor (must be running)
-- **Wayland** - Session type
+- **DankMaterialShell** >= 0.1.0
+- **wl-mirror** - Wayland screen mirroring utility
+- **niri** compositor
 
 ### Installing wl-mirror
 
@@ -29,6 +58,11 @@ sudo pacman -S wl-mirror
 sudo dnf install wl-mirror
 ```
 
+**Ubuntu/Debian:**
+```bash
+sudo apt install wl-mirror
+```
+
 **From source:**
 ```bash
 git clone https://github.com/Ferdi265/wl-mirror.git
@@ -37,125 +71,95 @@ make
 sudo make install
 ```
 
-## Installation
-
-1. Clone or copy this plugin to your DankMaterialShell plugins directory:
-   ```bash
-   mkdir -p ~/.config/DankMaterialShell/plugins
-   cp -r DankDisplayMirror ~/.config/DankMaterialShell/plugins/
-   ```
-
-2. Restart DankMaterialShell:
-   ```bash
-   dms restart
-   ```
-
-3. Enable the plugin:
-   - Open Settings → Plugins
-   - Click "Scan for Plugins"
-   - Toggle "Dank Display Mirror" on
-
-4. The plugin will now appear in your Control Center
-
 ## Usage
 
-### Starting a Mirror
+### From Control Center
 
-1. Open the Control Center (typically by clicking the system tray or using a keyboard shortcut)
-2. Find the "Display Mirror" tile
-3. Click on it to open the monitor selection panel
-4. Click on any monitor from the list to start mirroring it
-5. A new window will open displaying the mirrored content
+1. Open Control Center (default: Mod + I)
+2. Navigate to the Display Mirror section
+3. View list of available displays
+4. Click "Mirror" next to the display you want to mirror
+5. The mirrored window appears on your current display
+6. Click "Stop Mirror" to end the session
 
-### Stopping a Mirror
+### From DankBar Widget
 
-1. Open the Control Center
-2. Click on the "Display Mirror" tile
-3. Click the "Stop Mirror" button
+1. Add Display Mirror widget to your bar
+2. Click the widget icon to toggle the mirror list
+3. Select display to mirror or stop active mirrors
 
-### Settings
+### Tips
 
-Access plugin settings from Settings → Plugins → Dank Display Mirror:
+- Only one mirror session can be active at a time
+- The display list refreshes automatically when monitors are added or removed
+- Mirror windows can be moved, resized, and tiled like normal windows
 
-- **Auto-refresh Display List** - Automatically detect display changes
-- **Refresh Interval** - How often to check for new monitors (in seconds)
+## Examples
 
-## How It Works
+**Mirror your laptop display to an external monitor:**
+1. Connect external monitor
+2. Open Control Center → Display Mirror
+3. Select your laptop's eDP-1 display
+4. View the mirrored content on your external monitor
 
-This plugin replaces the manual command:
-```bash
-wl-mirror $(niri msg outputs | grep '^Output' | cut -d'(' -f 2 | cut -d')' -f 1 | fuzzel --dmenu --prompt 'src? ')
-```
+**Quick presentation setup:**
+1. Connect projector
+2. Use Display Mirror widget in bar
+3. Click to see available displays
+4. Mirror your main display to projector
 
-With a visual interface that:
-1. Queries `niri msg outputs` to get the list of available displays
-2. Displays them in a user-friendly list in the Control Center
-3. Executes `wl-mirror <output-name>` when you select a monitor
-4. Tracks the mirror process for easy stopping
+## Files
+
+- `plugin.json` - Plugin manifest
+- `DankDisplayMirrorWidget.qml` - Main widget component for the bar
+- `DanDisplayMirrorSettings.qml` - Settings UI
+- `MirrorState.qml` - State management for mirror sessions
+- `qmldir` - QML module definition
+- `README.md` - This file
 
 ## Troubleshooting
 
-### No displays appear
-- Ensure niri is running: `niri msg outputs`
-- Check that you're in a Wayland session
-- Verify niri is properly configured
+**Display list is empty:**
+- Ensure niri compositor is running
+- Check that `niri msg outputs` works in terminal
+- Verify you have multiple displays connected
 
-### Mirror won't start
+**Mirror doesn't start:**
 - Ensure wl-mirror is installed: `which wl-mirror`
-- Check wl-mirror works manually: `wl-mirror <output-name>`
-- Check the logs: `dms kill && dms run`
+- Check terminal for error messages
+- Verify display names are correct
 
-### Mirror doesn't stop
-- You can manually stop all mirrors: `killall wl-mirror`
-- Or find and kill specific processes: `ps aux | grep wl-mirror`
+**Mirror window disappears:**
+- This is normal when the target display is disconnected
+- The plugin will automatically clean up the session
 
-## Manual Commands
+## Compatibility
 
-For reference, here are the equivalent manual commands:
+- **Compositors**: Niri only
+- **Distros**: Universal - works on any Linux distribution
+- **Dependencies**: wl-mirror, niri
 
-**List outputs:**
-```bash
-niri msg outputs
-```
+## Technical Details
 
-**Start mirroring:**
-```bash
-wl-mirror <output-name>
-```
-
-**Stop all mirrors:**
-```bash
-killall wl-mirror
-```
-
-## Development
-
-This plugin is built using the DankMaterialShell plugin framework with:
-- QML for the UI components
-- Quickshell.Io.Process for command execution
-- Control Center widget integration
-
-### File Structure
-```
-DankDisplayMirror/
-├── plugin.json                      # Plugin manifest
-├── DankDisplayMirrorWidget.qml      # Main widget component
-├── DankDisplayMirrorSettings.qml    # Settings interface
-└── README.md                        # This file
-```
+- **Type**: Control Center plugin with optional bar widget
+- **Language**: QML (Qt Modeling Language)
+- **Backend**: Uses `wl-mirror` and `niri msg` commands
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit issues or pull requests.
+Found a bug or want to add features? Open an issue or submit a pull request on [GitHub](https://github.com/jfchenier/dms-display-mirror)!
 
 ## License
 
-This plugin follows the same license as DankMaterialShell.
+MIT License - See LICENSE file for details
 
 ## Author
 
-Avenge Media
+Created by jfchenier for the DankMaterialShell community
 
-## Version
+## Links
 
-1.0.0
+- [DankMaterialShell](https://github.com/AvengeMedia/DankMaterialShell)
+- [Plugin Registry](https://plugins.danklinux.com/)
+- [wl-mirror](https://github.com/Ferdi265/wl-mirror)
+
