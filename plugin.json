@@ -9,7 +9,7 @@
     "capabilities": [
         "control-center"
     ],
-    "firstParty": true,
+    "firstParty": false,
     "component": "./DankDisplayMirrorWidget.qml",
     "settings": "./DankDisplayMirrorSettings.qml",
     "permissions": [
