@@ -352,7 +352,7 @@ PluginComponent {
         Row {
             spacing: Theme.spacingXS
             DankIcon {
-                name: root.hasActiveMirrors ? "screen_share" : "monitor"
+                name: "screen_share"
                 size: Theme.iconSize - 6
                 color: root.hasActiveMirrors ? Theme.primary : Theme.surfaceVariantText
                 anchors.verticalCenter: parent.verticalCenter
@@ -372,7 +372,7 @@ PluginComponent {
         Column {
             spacing: Theme.spacingXS
             DankIcon {
-                name: root.hasActiveMirrors ? "screen_share" : "monitor"
+                name: "screen_share"
                 size: Theme.iconSize - 6
                 color: root.hasActiveMirrors ? Theme.primary : Theme.surfaceVariantText
                 anchors.horizontalCenter: parent.horizontalCenter
@@ -412,325 +412,308 @@ PluginComponent {
                 root.checkMirrorStatus()
             }
 
-            Column {
-                id: popoutColumn
+            // Refresh button
+            DankButton {
                 width: parent.width
-                spacing: Theme.spacingM
+                text: "Refresh Monitors"
+                iconName: "refresh"
+                onClicked: root.refreshMonitors()
+                enabled: !root.isLoading
+            }
 
-                // Refresh button
-                DankButton {
-                    text: "Refresh Monitors"
-                    iconName: "refresh"
-                    onClicked: root.refreshMonitors()
-                    enabled: !root.isLoading
-                }
+            Item {
+                width: 1
+                height: Theme.spacingS
+            }
 
-                // Loading indicator
-                StyledRect {
-                    width: parent.width
-                    height: 40
-                    radius: Theme.cornerRadius
-                    color: Theme.surfaceContainerHigh
-                    visible: root.isLoading
+            // Loading indicator
+            StyledRect {
+                width: parent.width
+                height: 40
+                radius: Theme.cornerRadius
+                color: Theme.surfaceContainerHigh
+                visible: root.isLoading
 
-                    Row {
-                        anchors.centerIn: parent
-                        spacing: Theme.spacingS
-
-                        DankIcon {
-                            name: "sync"
-                            size: Theme.iconSize
-                            color: Theme.primary
-                            anchors.verticalCenter: parent.verticalCenter
-
-                            RotationAnimation on rotation {
-                                from: 0
-                                to: 360
-                                duration: 1000
-                                loops: Animation.Infinite
-                                running: root.isLoading
-                            }
-                        }
-
-                        StyledText {
-                            text: "Loading displays..."
-                            font.pixelSize: Theme.fontSizeMedium
-                            color: Theme.surfaceText
-                            anchors.verticalCenter: parent.verticalCenter
-                        }
-                    }
-                }
-
-                // Active mirrors - one box per mirror (shown above available displays)
-                Column {
-                    width: parent.width
+                Row {
+                    anchors.centerIn: parent
                     spacing: Theme.spacingS
-                    visible: root.hasActiveMirrors
 
-                    Repeater {
-                        model: Object.keys(MirrorState.activeMirrors)
+                    DankIcon {
+                        name: "sync"
+                        size: Theme.iconSize
+                        color: Theme.primary
+                        anchors.verticalCenter: parent.verticalCenter
 
-                        delegate: Rectangle {
-                            required property var modelData
-                            required property int index
-                            
-                            width: parent.width
-                            height: mirrorStatusRow.implicitHeight + Theme.spacingM * 2
-                            radius: Theme.cornerRadius
-                            color: Theme.primaryPressed
-                            border.width: 2
-                            border.color: Theme.primary
-
-                            RowLayout {
-                                id: mirrorStatusRow
-                                anchors.fill: parent
-                                anchors.margins: Theme.spacingM
-                                spacing: Theme.spacingM
-
-                                DankIcon {
-                                    name: "screen_share"
-                                    size: Theme.iconSize
-                                    color: Theme.primary
-                                    Layout.alignment: Qt.AlignVCenter
-                                }
-
-                                Column {
-                                    spacing: 2
-                                    Layout.alignment: Qt.AlignVCenter
-                                    Layout.fillWidth: true
-                                    
-                                    StyledText {
-                                        text: {
-                                            const mirror = root.activeMirrors[modelData]
-                                            return mirror ? (mirror.source + " → " + mirror.target) : "Unknown"
-                                        }
-                                        font.pixelSize: Theme.fontSizeMedium
-                                        font.weight: Font.Medium
-                                        color: Theme.primary
-                                        elide: Text.ElideRight
-                                        wrapMode: Text.NoWrap
-                                        width: parent.width
-                                    }
-                                    
-                                    StyledText {
-                                        text: "PID: " + modelData
-                                        font.pixelSize: Theme.fontSizeSmall
-                                        color: Theme.surfaceTextMedium
-                                    }
-                                }
-
-                                DankButton {
-                                    id: stopButton
-                                    text: "Stop"
-                                    iconName: "stop"
-                                    onClicked: root.stopMirror(modelData)
-                                    Layout.alignment: Qt.AlignVCenter
-                                }
-                            }
+                        RotationAnimation on rotation {
+                            from: 0
+                            to: 360
+                            duration: 1000
+                            loops: Animation.Infinite
+                            running: root.isLoading
                         }
                     }
+
+                    StyledText {
+                        text: "Loading displays..."
+                        font.pixelSize: Theme.fontSizeMedium
+                        color: Theme.surfaceText
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
                 }
+            }
 
-                // Error display (if any)
-                StyledRect {
-                    width: parent.width
-                    height: errorColumnPopout.implicitHeight + Theme.spacingM * 2
-                    radius: Theme.cornerRadius
-                    color: Theme.surfaceContainerHigh
-                    visible: root.lastMirrorError !== ""
+            Item {
+                width: 1
+                height: Theme.spacingS
+                visible: root.hasActiveMirrors
+            }
 
-                    Column {
-                        id: errorColumnPopout
-                        anchors.fill: parent
-                        anchors.margins: Theme.spacingM
-                        spacing: Theme.spacingS
+            // Active mirrors section
+            Column {
+                width: parent.width
+                spacing: Theme.spacingS
+                visible: root.hasActiveMirrors
 
-                        Row {
+                Repeater {
+                    model: Object.keys(MirrorState.activeMirrors)
+
+                    delegate: Rectangle {
+                        required property var modelData
+                        required property int index
+                        
+                        width: parent.width
+                        height: mirrorStatusRow.implicitHeight + Theme.spacingM * 2
+                        radius: Theme.cornerRadius
+                        color: Theme.primaryPressed
+                        border.width: 2
+                        border.color: Theme.primary
+
+                        RowLayout {
+                            id: mirrorStatusRow
+                            anchors.fill: parent
+                            anchors.margins: Theme.spacingM
                             spacing: Theme.spacingM
 
                             DankIcon {
-                                name: "error"
+                                name: "screen_share"
                                 size: Theme.iconSize
-                                color: Theme.warning || Theme.error
-                                anchors.verticalCenter: parent.verticalCenter
+                                color: Theme.primary
+                                Layout.alignment: Qt.AlignVCenter
                             }
 
-                            StyledText {
-                                text: "Mirror Error"
-                                font.pixelSize: Theme.fontSizeMedium
-                                font.weight: Font.Medium
-                                color: Theme.surfaceText
-                            }
-                        }
-
-                        StyledText {
-                            text: root.lastMirrorError
-                            font.pixelSize: Theme.fontSizeSmall
-                            color: Theme.surfaceVariantText
-                            wrapMode: Text.WordWrap
-                            leftPadding: Theme.iconSize + Theme.spacingM
-                            width: parent.width - Theme.spacingM * 2
-                        }
-                    }
-                }
-
-                // Monitor list (available displays)
-                Column {
-                    width: parent.width
-                    spacing: Theme.spacingS
-                    visible: filteredMonitors().length > 0 && !root.isLoading
-
-                    Repeater {
-                        model: filteredMonitors()
-
-                        delegate: Rectangle {
-                            required property var modelData
-                            required property int index
-                            width: parent.width
-                            height: 60
-                            radius: Theme.cornerRadius
-                            color: monitorArea.containsMouse ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.08) : Theme.withAlpha(Theme.surfaceContainerHighest, Theme.popupTransparency)
-                            border.color: Theme.primary
-                            border.width: 0
-
-                            Row {
-                                anchors.fill: parent
-                                anchors.margins: Theme.spacingM
-                                spacing: Theme.spacingM
-
-                                DankIcon {
-                                    name: "monitor"
-                                    size: Theme.iconSize + 8
+                            Column {
+                                spacing: 2
+                                Layout.alignment: Qt.AlignVCenter
+                                Layout.fillWidth: true
+                                
+                                StyledText {
+                                    text: {
+                                        const mirror = root.activeMirrors[modelData]
+                                        return mirror ? (mirror.source + " → " + mirror.target) : "Unknown"
+                                    }
+                                    font.pixelSize: Theme.fontSizeMedium
+                                    font.weight: Font.Medium
                                     color: Theme.primary
-                                    anchors.verticalCenter: parent.verticalCenter
+                                    elide: Text.ElideRight
+                                    wrapMode: Text.NoWrap
+                                    width: parent.width
                                 }
-
-                                Column {
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    spacing: Theme.spacingXS
-
-                                    StyledText {
-                                        text: modelData
-                                        font.pixelSize: Theme.fontSizeMedium
-                                        font.weight: Font.Medium
-                                        color: Theme.surfaceText
-                                    }
-
-                                    StyledText {
-                                        text: "Click to mirror this output"
-                                        font.pixelSize: Theme.fontSizeSmall
-                                        color: Theme.surfaceVariantText
-                                    }
-                                }
-
-                                Item {
-                                    Layout.fillWidth: true
-                                }
-
-                                DankIcon {
-                                    name: "arrow_forward"
-                                    size: Theme.iconSize
-                                    color: Theme.surfaceVariantText
-                                    anchors.verticalCenter: parent.verticalCenter
+                                
+                                StyledText {
+                                    text: "PID: " + modelData
+                                    font.pixelSize: Theme.fontSizeSmall
+                                    color: Theme.surfaceTextMedium
                                 }
                             }
 
-                            MouseArea {
-                                id: monitorArea
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: {
-                                    root.startMirror(modelData)
-                                }
+                            DankButton {
+                                text: "Stop"
+                                iconName: "stop"
+                                onClicked: root.stopMirror(modelData)
+                                Layout.alignment: Qt.AlignVCenter
                             }
-                        }
-                    }
-                }
-
-                // Empty state (popout)
-                StyledRect {
-                    width: parent.width
-                    height: 100
-                    radius: Theme.cornerRadius
-                    color: Theme.surfaceContainerHigh
-                    visible: filteredMonitors().length === 0 && !root.isLoading
-
-                    Column {
-                        anchors.centerIn: parent
-                        spacing: Theme.spacingS
-
-                        DankIcon {
-                            name: root.monitors.length === 0 ? "monitor_off" : "check_circle"
-                            size: Theme.iconSize + 16
-                            color: Theme.surfaceVariantText
-                            anchors.horizontalCenter: parent.horizontalCenter
-                        }
-
-                        StyledText {
-                            text: root.monitors.length === 0 ? "No displays found" : "No displays available"
-                            font.pixelSize: Theme.fontSizeMedium
-                            color: Theme.surfaceText
-                            anchors.horizontalCenter: parent.horizontalCenter
-                        }
-
-                        StyledText {
-                            text: "Make sure niri is running"
-                            font.pixelSize: Theme.fontSizeSmall
-                            color: Theme.surfaceVariantText
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            visible: root.monitors.length === 0
-                        }
-                    }
-                }
-
-                // Error display (if any)
-                StyledRect {
-                    width: parent.width
-                    height: errorColumn.implicitHeight + Theme.spacingM * 2
-                    radius: Theme.cornerRadius
-                    color: Theme.surfaceContainerHigh
-                    visible: root.lastMirrorError !== ""
-
-                    Column {
-                        id: errorColumn
-                        anchors.fill: parent
-                        anchors.margins: Theme.spacingM
-                        spacing: Theme.spacingS
-
-                        Row {
-                            spacing: Theme.spacingM
-
-                            DankIcon {
-                                name: "error"
-                                size: Theme.iconSize
-                                color: Theme.warning || Theme.error
-                                anchors.verticalCenter: parent.verticalCenter
-                            }
-
-                            StyledText {
-                                text: "Mirror Error"
-                                font.pixelSize: Theme.fontSizeMedium
-                                font.weight: Font.Medium
-                                color: Theme.surfaceText
-                            }
-                        }
-
-                        StyledText {
-                            text: root.lastMirrorError
-                            font.pixelSize: Theme.fontSizeSmall
-                            color: Theme.surfaceVariantText
-                            wrapMode: Text.WordWrap
-                            leftPadding: Theme.iconSize + Theme.spacingM
-                            width: parent.width - Theme.spacingM * 2
                         }
                     }
                 }
             }
-        }
-    }
 
-    // Control Center detail panel (when clicking the CC tile arrow/chevron)
+            Item {
+                width: 1
+                height: Theme.spacingS
+            }
+
+            // Scrollable list of available displays
+            MouseArea {
+                id: scrollArea
+                width: parent.width
+                height: 200
+                acceptedButtons: Qt.NoButton
+                propagateComposedEvents: true
+
+                onWheel: wheel => {
+                    const deltaY = wheel.angleDelta.y
+                    const scrollAmount = deltaY > 0 ? -60 : 60
+                    displayFlickable.contentY = Math.max(0, Math.min(displayFlickable.contentHeight - displayFlickable.height, displayFlickable.contentY + scrollAmount))
+                    wheel.accepted = true
+                }
+
+                DankFlickable {
+                    id: displayFlickable
+                    anchors.fill: parent
+                    contentHeight: displayColumn.height
+                    clip: true
+
+                    Column {
+                        id: displayColumn
+                        width: parent.width
+                        spacing: Theme.spacingS
+
+                        // Empty state
+                        Item {
+                            width: parent.width
+                            height: filteredMonitors().length === 0 && !root.isLoading ? 160 : 0
+                            visible: height > 0
+
+                            Column {
+                                anchors.centerIn: parent
+                                spacing: Theme.spacingS
+
+                                DankIcon {
+                                    name: root.monitors.length === 0 ? "monitor_off" : "check_circle"
+                                    size: Theme.iconSize + 16
+                                    color: Theme.surfaceVariantText
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                }
+
+                                StyledText {
+                                    text: root.monitors.length === 0 ? "No displays found" : "No displays available"
+                                    font.pixelSize: Theme.fontSizeMedium
+                                    color: Theme.surfaceText
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                }
+
+                                StyledText {
+                                    text: "Make sure niri is running"
+                                    font.pixelSize: Theme.fontSizeSmall
+                                    color: Theme.surfaceVariantText
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    visible: root.monitors.length === 0
+                                }
+                            }
+                        }
+
+                        // Display list
+                        Repeater {
+                            model: filteredMonitors()
+
+                            delegate: Rectangle {
+                                required property var modelData
+                                required property int index
+                                
+                                width: parent.width
+                                height: 50
+                                radius: Theme.cornerRadius
+                                color: monitorArea.containsMouse ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.08) : Theme.surfaceLight
+                                border.color: Theme.outlineLight
+                                border.width: 1
+
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.margins: Theme.spacingM
+                                    spacing: Theme.spacingM
+
+                                    DankIcon {
+                                        name: "monitor"
+                                        size: Theme.iconSize
+                                        color: Theme.primary
+                                        Layout.alignment: Qt.AlignVCenter
+                                    }
+
+                                    Column {
+                                        spacing: 2
+                                        Layout.alignment: Qt.AlignVCenter
+                                        Layout.fillWidth: true
+
+                                        StyledText {
+                                            text: modelData
+                                            font.pixelSize: Theme.fontSizeMedium
+                                            font.weight: Font.Medium
+                                            color: Theme.surfaceText
+                                            elide: Text.ElideRight
+                                            wrapMode: Text.NoWrap
+                                            width: parent.width
+                                        }
+
+                                        StyledText {
+                                            text: "Click to mirror"
+                                            font.pixelSize: Theme.fontSizeSmall
+                                            color: Theme.surfaceVariantText
+                                        }
+                                    }
+
+                                    Item {
+                                        Layout.fillWidth: true
+                                        height: 1
+                                    }
+                                }
+
+                                MouseArea {
+                                    id: monitorArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: root.startMirror(modelData)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Error display
+            StyledRect {
+                width: parent.width
+                height: errorColumn.implicitHeight + Theme.spacingM * 2
+                radius: Theme.cornerRadius
+                color: Theme.surfaceContainerHigh
+                visible: root.lastMirrorError !== ""
+
+                Column {
+                    id: errorColumn
+                    anchors.fill: parent
+                    anchors.margins: Theme.spacingM
+                    spacing: Theme.spacingS
+
+                    Row {
+                        spacing: Theme.spacingM
+
+                        DankIcon {
+                            name: "error"
+                            size: Theme.iconSize
+                            color: Theme.warning || Theme.error
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+
+                        StyledText {
+                            text: "Mirror Error"
+                            font.pixelSize: Theme.fontSizeMedium
+                            font.weight: Font.Medium
+                            color: Theme.surfaceText
+                        }
+                    }
+
+                    StyledText {
+                        text: root.lastMirrorError
+                        font.pixelSize: Theme.fontSizeSmall
+                        color: Theme.surfaceVariantText
+                        wrapMode: Text.WordWrap
+                        leftPadding: Theme.iconSize + Theme.spacingM
+                        width: parent.width - Theme.spacingM * 2
+                    }
+                }
+            }
+        }
+    }    // Control Center detail panel (when clicking the CC tile arrow/chevron)
     ccDetailContent: Component {
         Rectangle {
             implicitHeight: Math.min(headerRow.height + contentFlickable.contentHeight + Theme.spacingM * 2, 400 + headerRow.height)
