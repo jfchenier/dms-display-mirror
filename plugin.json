@@ -1,7 +1,7 @@
 {
     "id": "dankDisplayMirror",
     "name": "Display Mirror",
-    "description": "Mirror niri displays using wl-mirror from the Control Center and Bar Widgets",
+    "description": "Mirror niri displays using wl-mirror from the control center and bar",
     "version": "1.0.0",
     "author": "jfchenier",
     "icon": "screen_share",

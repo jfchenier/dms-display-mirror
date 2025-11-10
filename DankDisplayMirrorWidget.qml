@@ -17,6 +17,7 @@ PluginComponent {
     property bool isLoading: false
     property bool justStartedMirror: false  // Track if we just started a mirror vs checking status
     property string lastStartedSource: ""   // Track which source we just started mirroring
+    property bool wlMirrorInstalled: true
     
     // Use shared singleton state so all widget instances see the same values
     // activeMirrors structure: {pid: {source: "outputName", target: "outputName"}}
@@ -112,9 +113,14 @@ PluginComponent {
 
     Component.onCompleted: {
         console.log("DisplayMirror: Widget completed. activeMirrorCount:", activeMirrorCount, "hasActiveMirrors:", hasActiveMirrors)
+        checkWlMirrorInstalled()
         refreshMonitors()
         detectFocusedOutput()
         checkMirrorStatus()
+    }
+
+    function checkWlMirrorInstalled() {
+        wlMirrorCheckProcess.running = true
     }
 
     // Removed redundant reassignment Connections; bindings are direct now
@@ -143,6 +149,12 @@ PluginComponent {
 
     function startMirror(outputName) {
         if (!outputName || isLoading) return
+
+        if (!root.wlMirrorInstalled) {
+            lastMirrorError = "wl-mirror is not installed"
+            Quickshell.execDetached(["sh", "-c", "notify-send 'Display Mirror' 'wl-mirror is not installed. Please install it first.' -u critical"])
+            return
+        }
 
         // Detect current focused output first
         detectFocusedOutput()
@@ -210,6 +222,28 @@ PluginComponent {
             verifyMirrorProcess.command = ["sh", "-c", "ps -p " + pid + " -o pid= || true"]
             verifyMirrorProcess.tag = pid  // Store which PID we're checking
             verifyMirrorProcess.running = true
+        }
+    }
+
+    Process {
+        id: wlMirrorCheckProcess
+        command: ["sh", "-c", "command -v wl-mirror"]
+        running: false
+
+        stdout: SplitParser {
+            onRead: data => {
+                if (data.trim().length > 0) {
+                    root.wlMirrorInstalled = true
+                    console.log("DisplayMirror: wl-mirror is installed at:", data.trim())
+                }
+            }
+        }
+
+        onExited: (exitCode, exitStatus) => {
+            if (exitCode !== 0) {
+                root.wlMirrorInstalled = false
+                console.warn("DisplayMirror: wl-mirror is not installed")
+            }
         }
     }
 
@@ -401,6 +435,7 @@ PluginComponent {
             onVisibleChanged: {
                 if (visible) {
                     console.log("DisplayMirror: Popout became visible, detecting focused output")
+                    root.checkWlMirrorInstalled()
                     root.detectFocusedOutput()
                     root.checkMirrorStatus()
                 }
@@ -408,6 +443,7 @@ PluginComponent {
 
             Component.onCompleted: {
                 console.log("DisplayMirror: Popout opened, detecting focused output")
+                root.checkWlMirrorInstalled()
                 root.detectFocusedOutput()
                 root.checkMirrorStatus()
             }
@@ -424,6 +460,57 @@ PluginComponent {
             Item {
                 width: 1
                 height: Theme.spacingS
+            }
+
+            // wl-mirror not installed warning
+            StyledRect {
+                width: parent.width
+                height: wlMirrorWarningColumn.implicitHeight + Theme.spacingM * 2
+                radius: Theme.cornerRadius
+                color: Theme.errorContainer || Theme.surfaceContainerHigh
+                visible: !root.wlMirrorInstalled
+
+                Column {
+                    id: wlMirrorWarningColumn
+                    anchors.fill: parent
+                    anchors.margins: Theme.spacingM
+                    spacing: Theme.spacingS
+
+                    Row {
+                        spacing: Theme.spacingM
+                        width: parent.width
+
+                        DankIcon {
+                            name: "warning"
+                            size: Theme.iconSize
+                            color: Theme.error
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+
+                        StyledText {
+                            text: "wl-mirror Not Installed"
+                            font.pixelSize: Theme.fontSizeMedium
+                            font.weight: Font.Bold
+                            color: Theme.error
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                    }
+
+                    StyledText {
+                        text: "The wl-mirror utility is required for display mirroring but is not installed on your system."
+                        font.pixelSize: Theme.fontSizeSmall
+                        color: Theme.surfaceText
+                        wrapMode: Text.WordWrap
+                        width: parent.width
+                        lineHeight: 1.3
+                    }
+                }
+            }
+
+            Item {
+                width: 1
+                height: Theme.spacingS
+                visible: !root.wlMirrorInstalled
             }
 
             // Loading indicator
@@ -549,6 +636,7 @@ PluginComponent {
                 height: 200
                 acceptedButtons: Qt.NoButton
                 propagateComposedEvents: true
+                visible: root.wlMirrorInstalled
 
                 onWheel: wheel => {
                     const deltaY = wheel.angleDelta.y
@@ -789,6 +877,51 @@ PluginComponent {
                     width: parent.width
                     spacing: Theme.spacingM
 
+                // wl-mirror not installed warning
+                StyledRect {
+                    width: parent.width
+                    height: wlMirrorWarningColumnCC.implicitHeight + Theme.spacingM * 2
+                    radius: Theme.cornerRadius
+                    color: Theme.errorContainer || Theme.surfaceContainerHigh
+                    visible: !root.wlMirrorInstalled
+
+                    Column {
+                        id: wlMirrorWarningColumnCC
+                        anchors.fill: parent
+                        anchors.margins: Theme.spacingM
+                        spacing: Theme.spacingS
+
+                        Row {
+                            spacing: Theme.spacingM
+                            width: parent.width
+
+                            DankIcon {
+                                name: "warning"
+                                size: Theme.iconSize
+                                color: Theme.error
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+
+                            StyledText {
+                                text: "wl-mirror Not Installed"
+                                font.pixelSize: Theme.fontSizeMedium
+                                font.weight: Font.Bold
+                                color: Theme.error
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+                        }
+
+                        StyledText {
+                            text: "The wl-mirror utility is required for display mirroring but is not installed on your system."
+                            font.pixelSize: Theme.fontSizeSmall
+                            color: Theme.surfaceText
+                            wrapMode: Text.WordWrap
+                            width: parent.width
+                            lineHeight: 1.3
+                        }
+                    }
+                }
+
                 // Loading indicator
                 StyledRect {
                     width: parent.width
@@ -832,7 +965,7 @@ PluginComponent {
                     font.pixelSize: Theme.fontSizeSmall
                     color: Theme.surfaceVariantText
                     wrapMode: Text.WordWrap
-                    visible: filteredMonitors().length > 0 && !root.isLoading
+                    visible: filteredMonitors().length > 0 && !root.isLoading && root.wlMirrorInstalled
                     bottomPadding: Theme.spacingS
                 }
 
@@ -954,7 +1087,7 @@ PluginComponent {
                 Column {
                     width: parent.width
                     spacing: Theme.spacingS
-                    visible: filteredMonitors().length > 0 && !root.isLoading
+                    visible: filteredMonitors().length > 0 && !root.isLoading && root.wlMirrorInstalled
 
                     Repeater {
                         model: filteredMonitors()
@@ -1026,7 +1159,7 @@ PluginComponent {
                     height: 100
                     radius: Theme.cornerRadius
                     color: Theme.surfaceContainerHigh
-                    visible: filteredMonitors().length === 0 && !root.isLoading
+                    visible: filteredMonitors().length === 0 && !root.isLoading && root.wlMirrorInstalled
 
                     Column {
                         anchors.centerIn: parent
