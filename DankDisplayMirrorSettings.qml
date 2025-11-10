@@ -7,7 +7,7 @@ import qs.Modules.Plugins
 
 PluginSettings {
     id: root
-    pluginId: "dankDisplayMirror"
+    pluginId: "displayMirror"
 
     StyledText {
         width: parent.width
