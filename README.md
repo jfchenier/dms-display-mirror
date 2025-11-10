@@ -73,14 +73,18 @@ sudo make install
 
 ## Usage
 
+
+
 ### From Control Center
 
 1. Open Control Center (default: Mod + I)
-2. Navigate to the Display Mirror section
-3. View list of available displays
-4. Click "Mirror" next to the display you want to mirror
-5. The mirrored window appears on your current display
-6. Click "Stop Mirror" to end the session
+2. Click the pen (edit) button to customize widgets
+3. Add the Display Mirror widget to the Control Center
+4. Navigate to the Display Mirror section
+5. View list of available displays
+6. Click "Mirror" next to the display you want to mirror
+7. The mirrored window appears on your current display
+8. Click "Stop Mirror" to end the session
 
 ### From DankBar Widget
 
@@ -88,62 +92,11 @@ sudo make install
 2. Click the widget icon to toggle the mirror list
 3. Select display to mirror or stop active mirrors
 
-### Tips
-
-- Only one mirror session can be active at a time
-- The display list refreshes automatically when monitors are added or removed
-- Mirror windows can be moved, resized, and tiled like normal windows
-
-## Examples
-
-**Mirror your laptop display to an external monitor:**
-1. Connect external monitor
-2. Open Control Center → Display Mirror
-3. Select your laptop's eDP-1 display
-4. View the mirrored content on your external monitor
-
-**Quick presentation setup:**
-1. Connect projector
-2. Use Display Mirror widget in bar
-3. Click to see available displays
-4. Mirror your main display to projector
-
-## Files
-
-- `plugin.json` - Plugin manifest
-- `DankDisplayMirrorWidget.qml` - Main widget component for the bar
-- `DanDisplayMirrorSettings.qml` - Settings UI
-- `MirrorState.qml` - State management for mirror sessions
-- `qmldir` - QML module definition
-- `README.md` - This file
-
-## Troubleshooting
-
-**Display list is empty:**
-- Ensure niri compositor is running
-- Check that `niri msg outputs` works in terminal
-- Verify you have multiple displays connected
-
-**Mirror doesn't start:**
-- Ensure wl-mirror is installed: `which wl-mirror`
-- Check terminal for error messages
-- Verify display names are correct
-
-**Mirror window disappears:**
-- This is normal when the target display is disconnected
-- The plugin will automatically clean up the session
-
 ## Compatibility
 
 - **Compositors**: Niri only
 - **Distros**: Universal - works on any Linux distribution
 - **Dependencies**: wl-mirror, niri
-
-## Technical Details
-
-- **Type**: Control Center plugin with optional bar widget
-- **Language**: QML (Qt Modeling Language)
-- **Backend**: Uses `wl-mirror` and `niri msg` commands
 
 ## Contributing
 
