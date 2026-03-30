@@ -9,14 +9,18 @@ import qs.Modules.Plugins
 
 PluginComponent {
     id: root
+    pluginId: "displayMirror"
+    pluginService: PluginService
 
     property bool autoRefresh: pluginData.autoRefresh ?? false
     property int refreshInterval: pluginData.refreshInterval || 30
-
+    property bool mirrorFromCurrentScreen: pluginData.mirrorFromCurrentScreen ?? false
+    
     property var monitors: []
     property bool isLoading: false
     property bool justStartedMirror: false  // Track if we just started a mirror vs checking status
     property string lastStartedSource: ""   // Track which source we just started mirroring
+    property string lastStartedTarget: ""   // Track which target we just started mirroring
     property bool wlMirrorInstalled: true
     
     // Use shared singleton state so all widget instances see the same values
@@ -176,17 +180,25 @@ PluginComponent {
 
             isLoading = true
             justStartedMirror = true
-            lastStartedSource = outputName
             lastMirrorError = ""
             lastMirrorOutput = ""
             
             // Close the Control Center using the proper PopoutService API
             // This prevents CC from staying open below the fullscreen wl-mirror window
             PopoutService.closeControlCenter()
+
+            // Launch wl-mirror in background
+            const sourceOutput = root.mirrorFromCurrentScreen ? root.currentFocusedOutput : outputName
+            const finalTarget = root.mirrorFromCurrentScreen ? outputName : root.currentFocusedOutput
             
-            // Launch wl-mirror in background, echo its PID
-            const safeOutput = outputName.replace(/"/g, '\\"')
-            mirrorProcess.command = ["sh", "-c", "wl-mirror --fullscreen \"" + safeOutput + "\" >/dev/null 2>&1 & echo $!"]
+            const safeSource = sourceOutput.replace(/"/g, '\\"')
+            const safeTarget = finalTarget.replace(/"/g, '\\"')
+            
+            mirrorProcess.command = ["sh", "-c", "wl-mirror --fullscreen-output \"" + safeTarget + "\" \"" + safeSource + "\" >/dev/null 2>&1 & echo $!"]
+            
+            // Track the actual source and target used (for addMirror when process starts)
+            lastStartedSource = sourceOutput
+            lastStartedTarget = finalTarget
             mirrorProcess.running = true
         })
     }
@@ -249,7 +261,7 @@ PluginComponent {
 
     Process {
         id: monitorProcess
-        command: ["sh", "-c", "niri msg outputs | grep '^Output' | cut -d'(' -f 2 | cut -d')' -f 1"]
+        command: ["sh", "-c", "niri msg outputs | grep '^Output' | awk -F'[()]' '{print $(NF-1)}'"]
         running: false
 
         property var monitorList: []
@@ -289,7 +301,7 @@ PluginComponent {
 
     Process {
         id: focusedOutputProcess
-        command: ["sh", "-c", "niri msg focused-output 2>/dev/null | grep -oP '(?<=\\().*(?=\\))' | head -1"]
+        command: ["sh", "-c", "niri msg focused-output 2>/dev/null | grep '^Output' | awk -F'[()]' '{print $(NF-1)}' | head -1"]
         running: false
 
         stdout: SplitParser {
@@ -319,8 +331,8 @@ PluginComponent {
                 const pid = data.trim()
                 lastMirrorOutput = pid
                 // Add mirror with source and target we just started
-                if (lastStartedSource && pid && currentFocusedOutput) {
-                    root.addMirror(pid, lastStartedSource, currentFocusedOutput)
+                if (lastStartedSource && pid && lastStartedTarget) {
+                    root.addMirror(pid, lastStartedSource, lastStartedTarget)
                 }
             }
         }
@@ -429,7 +441,7 @@ PluginComponent {
             id: detailPopout
 
             headerText: "Display Mirror"
-            detailsText: hasActiveMirrors ? (activeMirrorCount + " display" + (activeMirrorCount > 1 ? "s" : "") + " currently being mirrored.") : (currentFocusedOutput ? "Choose an output to start mirroring on the current display" : "Select a display to mirror")
+            detailsText: hasActiveMirrors ? (activeMirrorCount + " display" + (activeMirrorCount > 1 ? "s" : "") + " currently being mirrored.") : (currentFocusedOutput ? (root.mirrorFromCurrentScreen ? "Choose an output to mirror the current display onto (" + currentFocusedOutput + "):": "Choose an output to mirror onto the current display (" + currentFocusedOutput + "):") : "Select a display to mirror")
             showCloseButton: true
 
             onVisibleChanged: {
@@ -733,7 +745,7 @@ PluginComponent {
                                         }
 
                                         StyledText {
-                                            text: "Click to mirror"
+                                            text: root.mirrorFromCurrentScreen ? "Mirror this display → " + modelData : "Mirror " + modelData + " → this display"
                                             font.pixelSize: Theme.fontSizeSmall
                                             color: Theme.surfaceVariantText
                                         }
@@ -961,7 +973,7 @@ PluginComponent {
                 // Info text (CC detail)
                 StyledText {
                     width: parent.width - Theme.spacingM * 2
-                    text: hasActiveMirrors ? (activeMirrorCount + " display" + (activeMirrorCount > 1 ? "s" : "") + " currently being mirrored.") : (currentFocusedOutput ? "Choose an output to start mirroring on the current display" : "Select a display to mirror")
+            text: hasActiveMirrors ? (activeMirrorCount + " display" + (activeMirrorCount > 1 ? "s" : "") + " currently being mirrored.") : (currentFocusedOutput ? (root.mirrorFromCurrentScreen ? "Choose an output to mirror " + currentFocusedOutput + " onto:" : "Choose an output to mirror on " + currentFocusedOutput + ":") : "Select a display to mirror")
                     font.pixelSize: Theme.fontSizeSmall
                     color: Theme.surfaceVariantText
                     wrapMode: Text.WordWrap
@@ -1128,7 +1140,7 @@ PluginComponent {
                                     }
 
                                     StyledText {
-                                        text: "Click to start mirroring"
+                                        text: mirrorFromCurrentScreen ? "Click to mirror on this display" : "Click to mirror this display"
                                         font.pixelSize: Theme.fontSizeSmall
                                         color: Theme.surfaceVariantText
                                     }

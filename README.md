@@ -11,6 +11,7 @@ A DankMaterialShell plugin that provides an easy interface to mirror niri displa
 - **One-Click Mirroring** - Start screen mirroring with a single click
 - **Quick Stop** - Stop active mirror sessions instantly
 - **Bar Widget** - Show mirroring status and control from the DankBar
+- **Mirror Behavior** - Choose in which direction you want to mirror your display (from or to the selected display)
 
 ## Installation
 

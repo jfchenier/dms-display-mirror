@@ -27,6 +27,34 @@ PluginSettings {
 
     StyledRect {
         width: parent.width
+        height: behaviorColumn.implicitHeight + Theme.spacingL * 2
+        radius: Theme.cornerRadius
+        color: Theme.surfaceContainerHigh
+
+        Column {
+            id: behaviorColumn
+            anchors.fill: parent
+            anchors.margins: Theme.spacingL
+            spacing: Theme.spacingM
+
+            StyledText {
+                text: "Mirror Behavior"
+                font.pixelSize: Theme.fontSizeMedium
+                font.weight: Font.Medium
+                color: Theme.surfaceText
+            }
+
+            ToggleSetting {
+                settingKey: "mirrorFromCurrentScreen"
+                label: "Mirror From Current Display"
+                description: "Mirror the current display onto the selected display (instead of mirroring the selected display onto the current one) (default behavior on most Desktop Environments)"
+                defaultValue: false
+            }
+        }
+    }
+
+    StyledRect {
+        width: parent.width
         height: refreshColumn.implicitHeight + Theme.spacingL * 2
         radius: Theme.cornerRadius
         color: Theme.surfaceContainerHigh

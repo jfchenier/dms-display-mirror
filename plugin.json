@@ -2,7 +2,7 @@
     "id": "displayMirror",
     "name": "Display Mirror",
     "description": "Mirror niri displays using wl-mirror from the control center and bar",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "author": "jfchenier",
     "icon": "screen_share",
     "type": "widget",
