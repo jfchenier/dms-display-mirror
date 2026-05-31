@@ -1,6 +1,6 @@
 # Display Mirror
 
-A DankMaterialShell plugin that provides an easy interface to mirror niri displays using wl-mirror from the control center and bar.
+A DankMaterialShell plugin that provides an easy interface to mirror displays using wl-mirror from the control center and bar. It works on any compositor supported by DMS (niri, Hyprland, sway, dwl, …) using DMS abstractions.
 
 ![Display Mirror Screenshot](https://github.com/jfchenier/dms-display-mirror/blob/main/assets/screenshot.png)
 
@@ -44,7 +44,7 @@ Then:
 
 - **DankMaterialShell** >= 0.1.0
 - **wl-mirror** - Wayland screen mirroring utility
-- **niri** compositor
+- A **DMS-supported compositor** (niri, Hyprland, sway, dwl, …)
 
 ### Installing wl-mirror
 
@@ -94,9 +94,9 @@ sudo make install
 
 ## Compatibility
 
-- **Compositors**: Niri only
+- **Compositors**: Any DMS-supported compositor (niri, Hyprland, sway, dwl, …)
 - **Distros**: Universal - works on any Linux distribution
-- **Dependencies**: wl-mirror, niri
+- **Dependencies**: wl-mirror
 
 ## Contributing
 

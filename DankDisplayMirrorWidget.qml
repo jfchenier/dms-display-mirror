@@ -13,7 +13,8 @@ PluginComponent {
     property bool autoRefresh: pluginData.autoRefresh ?? false
     property int refreshInterval: pluginData.refreshInterval || 30
 
-    property var monitors: []
+    // Reactive list of all connected outputs. Updates automatically on hotplug, so no manual refresh is required.
+    property var monitors: Quickshell.screens.map(s => s.name)
     property bool isLoading: false
     property bool justStartedMirror: false  // Track if we just started a mirror vs checking status
     property string lastStartedSource: ""   // Track which source we just started mirroring
@@ -138,13 +139,19 @@ PluginComponent {
         }
     }
 
-    function refreshMonitors() {
-        isLoading = true
-        monitorProcess.running = true
+    function detectFocusedOutput() {
+        const screen = CompositorService.getFocusedScreen()
+        if (screen && screen.name) {
+            root.currentFocusedOutput = screen.name
+            console.log("DisplayMirror: Detected focused output:", screen.name)
+        } else {
+            console.warn("DisplayMirror: Could not detect focused output")
+        }
     }
 
-    function detectFocusedOutput() {
-        focusedOutputProcess.running = true
+    function refreshMonitors() {
+        // monitors is a reactive binding on Quickshell.screens, so just re-detect which output is focused
+        detectFocusedOutput()
     }
 
     function startMirror(outputName) {
@@ -243,68 +250,6 @@ PluginComponent {
             if (exitCode !== 0) {
                 root.wlMirrorInstalled = false
                 console.warn("DisplayMirror: wl-mirror is not installed")
-            }
-        }
-    }
-
-    Process {
-        id: monitorProcess
-        command: ["sh", "-c", "niri msg outputs | grep '^Output' | cut -d'(' -f 2 | cut -d')' -f 1"]
-        running: false
-
-        property var monitorList: []
-
-        stdout: SplitParser {
-            splitMarker: "\n"
-            onRead: data => {
-                // Each read is now a single line thanks to splitMarker
-                const line = data.trim()
-                if (line.length > 0) {
-                    monitorProcess.monitorList.push(line)
-                    console.log("DisplayMirror: Added monitor:", line, "- total now:", monitorProcess.monitorList.length)
-                }
-            }
-        }
-
-        onRunningChanged: {
-            if (running) {
-                monitorList = []
-            }
-        }
-
-        onExited: (exitCode, exitStatus) => {
-            root.isLoading = false
-            if (exitCode === 0) {
-                console.log("DisplayMirror: Process exited, collected", monitorProcess.monitorList.length, "monitors")
-                // Force QML to recognize array change by creating new array reference
-                root.monitors = []
-                root.monitors = monitorProcess.monitorList.slice()
-                console.log("DisplayMirror: Set root.monitors to", root.monitors.length, "items:", JSON.stringify(root.monitors))
-            } else {
-                console.warn("DisplayMirror: Failed to get monitors, exit code:", exitCode)
-                root.monitors = []
-            }
-        }
-    }
-
-    Process {
-        id: focusedOutputProcess
-        command: ["sh", "-c", "niri msg focused-output 2>/dev/null | grep -oP '(?<=\\().*(?=\\))' | head -1"]
-        running: false
-
-        stdout: SplitParser {
-            onRead: data => {
-                const output = data.trim()
-                if (output.length > 0) {
-                    root.currentFocusedOutput = output
-                    console.log("DisplayMirror: Detected focused output:", output)
-                }
-            }
-        }
-
-        onExited: (exitCode, exitStatus) => {
-            if (exitCode !== 0) {
-                console.warn("DisplayMirror: Failed to detect focused output, exit code:", exitCode)
             }
         }
     }
@@ -681,7 +626,7 @@ PluginComponent {
                                 }
 
                                 StyledText {
-                                    text: "Make sure niri is running"
+                                    text: "Make sure a DMS compatible compositor is running"
                                     font.pixelSize: Theme.fontSizeSmall
                                     color: Theme.surfaceVariantText
                                     anchors.horizontalCenter: parent.horizontalCenter
@@ -1180,7 +1125,7 @@ PluginComponent {
                         }
 
                         StyledText {
-                            text: "Make sure niri is running"
+                            text: "Make sure a DMS compatible compositor is running"
                             font.pixelSize: Theme.fontSizeSmall
                             color: Theme.surfaceVariantText
                             anchors.horizontalCenter: parent.horizontalCenter

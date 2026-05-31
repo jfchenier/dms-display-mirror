@@ -93,7 +93,7 @@ PluginSettings {
             }
 
             StyledText {
-                text: "This plugin allows you to mirror displays using wl-mirror. It's particularly useful for screen sharing or duplicating your screen.\n\nRequirements:\n• wl-mirror (install via package manager)\n• niri compositor\n• Wayland session\n\nUsage:\n1. Open Control Center\n2. Click the Display Mirror tile\n3. Select the display you want to mirror\n4. A new window will open showing the mirrored content\n5. Click 'Stop Mirror' to end the session"
+                text: "This plugin allows you to mirror displays using wl-mirror. It's particularly useful for screen sharing or duplicating your screen.\n\nRequirements:\n• wl-mirror (install via package manager)\n• A DMS-supported compositor (niri, Hyprland, sway, dwl, …)\n• Wayland session\n\nUsage:\n1. Open Control Center\n2. Click the Display Mirror tile\n3. Select the display you want to mirror\n4. A new window will open showing the mirrored content\n5. Click 'Stop Mirror' to end the session"
                 font.pixelSize: Theme.fontSizeSmall
                 color: Theme.surfaceVariantText
                 wrapMode: Text.WordWrap
@@ -135,7 +135,7 @@ PluginSettings {
             }
 
             StyledText {
-                text: "To manually control wl-mirror:\n\nList outputs:\n  niri msg outputs\n\nStart mirroring:\n  wl-mirror <output-name>\n\nStop all mirrors:\n  killall wl-mirror"
+                text: "To manually control wl-mirror:\n\nList outputs:\n  dms randr\n\nStart mirroring:\n  wl-mirror <output-name>\n\nStop all mirrors:\n  killall wl-mirror"
                 font.pixelSize: Theme.fontSizeSmall
                 color: Theme.surfaceVariantText
                 wrapMode: Text.WordWrap
