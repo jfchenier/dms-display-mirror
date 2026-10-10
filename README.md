@@ -42,7 +42,7 @@ Then:
 
 ## Requirements
 
-- **DankMaterialShell** >= 0.1.0
+- **DankMaterialShell** >= 1.0.0
 - **wl-mirror** - Wayland screen mirroring utility
 - **niri** compositor
 
