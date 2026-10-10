@@ -2,17 +2,30 @@
     "id": "displayMirror",
     "name": "Display Mirror",
     "description": "Mirror niri displays using wl-mirror from the control center and bar",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "author": "jfchenier",
     "icon": "screen_share",
     "type": "widget",
     "capabilities": [
         "control-center"
     ],
+    "category": "utilities",
+    "repo": "https://github.com/jfchenier/dms-display-mirror",
+    "compositors": [
+        "niri"
+    ],
+    "distro": [
+        "any"
+    ],
+    "dependencies": [
+        "wl-mirror"
+    ],
+    "requires_dms": ">=1.0.0",
     "firstParty": false,
     "component": "./DankDisplayMirrorWidget.qml",
     "settings": "./DankDisplayMirrorSettings.qml",
     "permissions": [
+        "process",
         "settings_read",
         "settings_write"
     ]
